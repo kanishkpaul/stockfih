@@ -177,12 +177,18 @@ export function StockfihApp() {
     setMoveAnalyses({});
 
     try {
+      // eslint-disable-next-line no-console
+      console.debug("handleAnalyzeGame: starting analysis");
       const client = getStockfishClient();
       const positions = [game.initialFen, ...game.moves.map((move) => move.afterFen)];
+      // eslint-disable-next-line no-console
+      console.debug("handleAnalyzeGame: positions length", positions.length);
       const nextPositionAnalyses: Record<number, PositionAnalysis> = {};
       const nextMoveAnalyses: Record<number, MoveAnalysis> = {};
 
       await client.newGame();
+      // eslint-disable-next-line no-console
+      console.debug("handleAnalyzeGame: client.newGame resolved");
       setAnalysisProgress({
         completed: 0,
         currentMove: game.moves[0]?.san ?? "Initial position",

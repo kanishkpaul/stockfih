@@ -30,8 +30,38 @@ class StockfishClient {
       throw new Error("Stockfish can only run in the browser.");
     }
 
-    this.initPromise = new Promise<void>((resolve, reject) => {
-      const worker = new Worker(this.enginePath);
+    this.initPromise = new Promise<void>(async (resolve, reject) => {
+      // Try to fetch the worker file first to provide a clearer error when
+      // the asset is missing or served incorrectly.
+      try {
+        // eslint-disable-next-line no-console
+        console.debug("Fetching Stockfish worker:", this.enginePath);
+        const resp = await fetch(this.enginePath, { method: "GET" });
+
+        if (!resp.ok) {
+          reject(new Error(`Failed to fetch Stockfish worker: ${resp.status} ${resp.statusText}`));
+          return;
+        }
+        // eslint-disable-next-line no-console
+        console.debug("Stockfish worker fetched successfully");
+      } catch (err) {
+        reject(new Error(`Failed to fetch Stockfish worker: ${String(err)}`));
+        return;
+      }
+
+      let worker: Worker;
+
+      try {
+        // eslint-disable-next-line no-console
+        console.debug("Constructing Stockfish worker from:", this.enginePath);
+        worker = new Worker(this.enginePath);
+        // eslint-disable-next-line no-console
+        console.debug("Stockfish worker constructed");
+      } catch (err) {
+        reject(new Error(`Failed to construct Stockfish worker: ${String(err)}`));
+        return;
+      }
+
       this.worker = worker;
 
       const timeout = window.setTimeout(() => {
@@ -39,11 +69,22 @@ class StockfishClient {
       }, 15_000);
 
       worker.addEventListener("message", (event) => {
-        const line = String(event.data ?? "").trim();
+        // Worker may post a string or an object; normalize to a trimmed string.
+        let raw = event.data ?? "";
+        let line: string;
+
+        try {
+          line = typeof raw === "string" ? raw.trim() : JSON.stringify(raw).trim();
+        } catch (e) {
+          line = String(raw).trim();
+        }
 
         if (!line) {
           return;
         }
+
+        // eslint-disable-next-line no-console
+        console.debug("Stockfish worker ->", line);
 
         if (!this.sawUciOk && line === "uciok") {
           this.sawUciOk = true;
@@ -51,18 +92,39 @@ class StockfishClient {
           return;
         }
 
-        if (line === "readyok" && this.sawUciOk) {
-          window.clearTimeout(timeout);
-          resolve();
-          return;
+        if (line === "readyok") {
+          // Prefer resolving any syncReady waiters first (used by newGame/
+          // analyzePosition). If there are none, this is likely the initial
+          // startup handshake and we should resolve the init promise.
+          const resolveReady = this.readyResolvers.shift();
+          if (resolveReady) {
+            resolveReady();
+            return;
+          }
+
+          if (this.sawUciOk) {
+            window.clearTimeout(timeout);
+            resolve();
+            return;
+          }
         }
 
-        this.consumeLine(line);
+        // If the engine prints unexpected content while there is a pending
+        // request, still pass it to the consumer for debugging/parsing.
+        try {
+          this.consumeLine(line);
+        } catch (err) {
+          // Surface parsing issues to the console for easier debugging.
+          // Don't reject here; let the pending request timeout if analysis fails.
+          // eslint-disable-next-line no-console
+          console.error("Error consuming Stockfish line:", err, line);
+        }
       });
 
-      worker.addEventListener("error", () => {
+      worker.addEventListener("error", (ev) => {
         window.clearTimeout(timeout);
-        reject(new Error("Stockfish failed to load in the browser worker."));
+        const message = (ev && (ev as any).message) || "Stockfish worker error";
+        reject(new Error(String(message)));
       });
 
       worker.postMessage("uci");

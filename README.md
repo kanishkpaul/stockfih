@@ -1,136 +1,100 @@
 # Stockfih
 
-Stockfih is a polished chess analysis web app that blends client-side Stockfish review with a language-model coaching layer.
+Stockfih is a chess analysis app that combines browser-side Stockfish evaluation with short natural-language coaching. The goal is simple: not just "what is the best move?", but "what was the idea I missed?"
 
-Tagline: **“Stockfish, but it tells you what you were supposed to see.”**
+This repo is part product build, part interface experiment. I wanted a tighter bridge between symbolic search and human-readable feedback, without hiding the engine details that make the analysis useful.
 
-## Screenshots
+## What it does today
 
-Add demo screenshots or a short screen recording here:
+- Parses PGN input and reconstructs the full game state move by move
+- Replays the game on an interactive board with keyboard navigation
+- Runs Stockfish in the browser through a dedicated Web Worker
+- Scores positions before and after each move
+- Classifies moves using evaluation swing and engine context
+- Shows best move suggestions and current-position analysis
+- Calls a protected explanation route to turn engine output into coaching text
+- Falls back to deterministic local explanations when no model token is configured
+- Caches generated explanations in `localStorage`
 
-- `docs/stockfih-board.png`
-- `docs/stockfih-analysis-panel.png`
-- `docs/stockfih-mobile.png`
+## Why this project is interesting
 
-## Features
+Most chess tooling is either:
 
-- Paste or load a PGN and parse headers, result, and move text
-- Replay the game on an interactive chessboard with previous/next controls
-- Navigate with keyboard left/right arrows
-- Flip the board and inspect move-by-move positions
-- Analyze positions in-browser with Stockfish running in a Web Worker
-- Show best move, eval before/after, eval swing, and move classification
-- Request concise move explanations through `/api/explain`
-- Fall back to a deterministic local explanation template when `HF_TOKEN` is missing
-- Cache explanations client-side in `localStorage`
-- Dark, premium “frontier lab” UI with loading, progress, and empty states
+- engine-strong but opaque, or
+- beginner-friendly but strategically shallow
 
-## Tech Stack
+Stockfih sits in the middle. It keeps the engine loop real while adding an explanation layer that helps a player understand the position instead of just memorizing the top line.
 
-- Next.js 16 App Router with TypeScript
-- Tailwind CSS v4
-- shadcn-style local UI primitives
-- `react-chessboard`
+## Stack
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS 4
 - `chess.js`
-- `stockfish` WASM package
+- `react-chessboard`
+- Stockfish WASM
 - Hugging Face Inference API
 
-## Getting Started
+## Local setup
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000` by default. If that port is already in use, Next.js will move to the next free port.
+Open `http://localhost:3000`.
 
-## Environment Variables
-
-Copy `.env.example` to `.env.local` and fill in what you need:
+If you want model-backed explanations, create `.env.local` with:
 
 ```bash
-HF_TOKEN=
+HF_TOKEN=your_token_here
 HF_MODEL=mistralai/Mistral-7B-Instruct-v0.3
 ```
 
-- `HF_TOKEN`: optional. If omitted, Stockfih uses the local explanation fallback.
-- `HF_MODEL`: optional. Defaults to `mistralai/Mistral-7B-Instruct-v0.3`.
+If `HF_TOKEN` is missing, the app still works and returns template-based explanations.
 
-## Project Structure
+## Project structure
 
 ```text
 app/
   api/explain/route.ts
-  globals.css
-  layout.tsx
-  page.tsx
 components/
-  AnalysisPanel.tsx
+  StockfihApp.tsx
   ChessBoardPanel.tsx
-  EvalBar.tsx
+  AnalysisPanel.tsx
   MoveList.tsx
   PgnInput.tsx
-  StockfihApp.tsx
-  ui/
 lib/
   chess.ts
   classify.ts
   prompts.ts
   stockfish.ts
-  types.ts
-  utils.ts
-public/
-  stockfish/
-scripts/
-  copy-stockfish.mjs
+public/stockfish/
+scripts/copy-stockfish.mjs
 ```
 
-## How Stockfish Is Wired
+## A few implementation details I care about
 
-- The app uses the `stockfish` npm package.
-- A postinstall script copies the browser engine files into `public/stockfish/`.
-- The client creates a dedicated Web Worker against `/stockfish/stockfish-18-lite-single.js`.
-- Analysis is performed position by position with UCI commands.
-- MultiPV is enabled so the UI can surface the best move plus alternatives.
-- If the worker fails or times out, the UI shows a useful analysis error instead of crashing.
+- Stockfish runs client-side, so the board analysis does not depend on a backend round-trip.
+- The explanation route never exposes the Hugging Face token to the client.
+- The UI keeps engine facts and language-model commentary separate, so the explanation layer cannot quietly replace the analysis layer.
+- Browser caching keeps repeated move explanations cheap and fast during review.
 
-## How HF Explanations Work
+## Current limitations
 
-- The client never sees `HF_TOKEN`.
-- The app sends move context to `app/api/explain/route.ts`.
-- The route forwards a chat-completion request to Hugging Face using `HF_MODEL`.
-- Prompting is constrained to the concrete engine data already computed.
-- If HF is unavailable or `HF_TOKEN` is unset, the route returns a deterministic template explanation.
+- Analysis is sequential, so longer PGNs can take a while at higher depths.
+- Move labels such as `Brilliant` and `Great` are heuristic rather than engine-canonical.
+- Explanations are grounded on the computed engine context, but they are still short-form coaching, not formal annotations.
 
-## Known Limitations
+## What I am adding next
 
-- Analysis is sequential, so long PGNs at depth 14 can take a while in-browser.
-- The board highlights the engine suggestion for the current board position, while the right panel reviews the selected move that led there.
-- Move quality labels for `Brilliant` and `Great` use lightweight heuristics on top of the requested eval-loss thresholds.
-- Client-side caching is per-browser and per-device.
+- Better principal variation browsing
+- Opening detection and phase segmentation
+- Sharper move-quality heuristics
+- Shareable annotated reports
+- Batch review for multiple games
 
-## Future Roadmap
+## Why it belongs in this repo collection
 
-- Deeper PV browsing with full candidate lines
-- Opening name detection and phase segmentation
-- Better “brilliant move” heuristics using sacrifice detection
-- Annotated share links and exported reports
-- Batch review for multiple PGNs
-- Optional persisted analysis snapshots
-
-## Why This Is Interesting
-
-- It bridges symbolic search engine evaluation with natural-language explanation.
-- It turns raw engine analysis into human-legible coaching.
-- It demonstrates AI product engineering, chess engine integration, LLM prompting, UI systems, and explainability.
-
-## Development Notes
-
-- `npm run lint` checks the TypeScript/React surface.
-- `npm run build` validates the production bundle.
-- The bundled Stockfish files are copied into `public/stockfish/` and ignored by ESLint.
-
-## License Notes
-
-- The repository includes the Stockfish browser engine assets under `public/stockfish/`.
-- See `public/stockfish/Copying.txt` for the engine’s GPLv3 license notice.
+Stockfih is the most product-shaped project here: real UI, real engine integration, real inference plumbing, and a clear point of view about how LLMs should support expert tools rather than replace them.

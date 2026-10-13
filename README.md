@@ -1,82 +1,88 @@
-# Stockfih
+# Stockfih v1 (archived)
 
-Chess analysis that runs Stockfish in your browser and turns its output into
-short coaching: not only "what was the best move?" but "what was the idea I
-missed?"
+This branch holds the first version of Stockfih: a Next.js web app that runs
+Stockfish in the browser and asks a language model to explain the moves.
 
-![Stockfih reviewing 3...Nf6, classified as a blunder, with Stockfish's best move and eval swing](docs/screenshot.png)
+It is frozen. Stockfih is being rebuilt on `main` as a desktop app that is as
+much a tool for looking inside Stockfish as it is a chess tutor. Read
+[`main`'s README](https://github.com/kanishkpaul/stockfih/tree/main) for that
+version. Nothing new lands here; fixes go into the rebuild.
 
-*The sample game (a Scholar's Mate). After 3...Nf6, Stockfish flags the blunder,
-shows the best move (g6), and draws the mating threat on the board.*
+![Stockfih v1 reviewing 3...Nf6 in the sample game](docs/screenshot.png)
 
-## What it does
+## What v1 does
 
-- Parses a PGN and replays the game on a board with arrow-key navigation
-- Runs Stockfish 18 (WASM) in a Web Worker, entirely client-side
-- Scores every position before and after each move, at depth 8 to 14
-- Labels moves from Best to Blunder by centipawn loss, and shows the best move
-  and the main alternative
-- Explains a move in three styles (default, "like I'm 1200", tactical) through
-  a server route that keeps the model token off the client
-- Falls back to deterministic template explanations when no token is set
-- Caches explanations in `localStorage`
+Paste a PGN and Stockfih replays it on a board. **Analyze Game** runs
+Stockfish 18 (WebAssembly, single thread, in a Web Worker) on every position
+at depth 8 to 14 with three candidate lines, then labels each move from Best
+to Blunder by how many centipawns it lost.
 
-Engine facts and model commentary are kept visibly separate, so the language
-model can explain the analysis but can't replace it.
+Pick a move and ask for an explanation in one of three styles: plain,
+"like I'm 1200", or tactical. A server route sends the engine's verdict to a
+model on the Hugging Face router, so the token never reaches the browser.
+Without a token, a fixed template answers instead. Explanations are cached in
+`localStorage`.
 
 ## Run it
 
-Needs Node 20.9+.
+Needs Node 20.9 or newer.
 
 ```bash
-npm install      # also copies the Stockfish build into public/stockfish/
-npm run dev      # http://localhost:3000
+git switch old
+npm install
+npm run dev
 ```
 
-Click **Load sample game**, then **Analyze Game**, then pick a move.
+Open http://localhost:3000, click **Load sample game**, then **Analyze Game**.
 
-For model-written explanations, create `.env.local`:
+For model-written explanations, put this in `.env.local`:
 
 ```bash
 HF_TOKEN=hf_...
-HF_MODEL=mistralai/Mistral-7B-Instruct-v0.3   # any chat model served by the HF router
+HF_MODEL=mistralai/Mistral-7B-Instruct-v0.3
 ```
 
-Requests go to Hugging Face's OpenAI-compatible router. Without `HF_TOKEN`
-everything still works; explanations come from templates.
+## Known problems
 
-Tested on macOS (Apple Silicon) with Node 24: installs, builds, and analyzes
-the sample game in the browser.
+These were found in a review on 2026-10-13 and are why v1 was retired rather
+than patched. The rebuild is designed around them.
 
-## Known issues
+- **Explanations leak between games.** The cache key is the move's index and
+  UCI string, not the game, so two games that play the same move at the same
+  ply share one explanation.
+- **A failed model call is cached forever.** The route quietly substitutes the
+  template, and the client stores it as if it were the real answer.
+- **Loading a game mid-analysis mixes games.** The analysis loop has no
+  cancellation and keeps writing results for the game it started with.
+- **Mate scores distort classification.** Mate in N is scored as
+  `100000 - N * 1000`, so a move that turns mate in 3 into mate in 5 is a
+  "Blunder", and "allows mate" shows as about 990 pawns. Checkmated positions
+  get no score at all, because Stockfish reports `score mate 0` without a
+  principal variation and the parser requires one.
+- **Labels ignore how winning the position is.** Fixed centipawn thresholds
+  treat losing two pawns at +10 the same as at 0.
+- **Engine timeouts never send `stop`**, so a late `bestmove` can resolve the
+  next request.
+- **The explain route accepts anything.** No size limits, no rate limit, and
+  the tone is not checked against the allowed values.
+- **Dependencies:** Next.js 16.2.6 has open advisories (fixed in 16.3.8 and
+  later), `npm run lint` reports two errors, `zustand` and the 10 MB asm.js
+  engine build are unused, and `npm install` rewrites the committed engine
+  files' modes.
 
-- **Mate scores leak into the eval swing.** When a move allows mate, the swing
-  shows as a raw number ("990.26 pawns") instead of "allows mate in 1".
-- **"Brilliant" and "Great" are too generous.** Any best move that delivers
-  mate is labelled Brilliant, and any best move that captures, checks, or
-  castles is labelled Great. In the sample game, the routine `Qxf7#` is
-  "Brilliant".
-- **Analysis is sequential.** Long games at depth 14 take a while.
-- `npm run lint` reports two errors (`prefer-const`, `no-explicit-any`).
-
-## Project structure
+## Layout
 
 ```text
-app/api/explain/route.ts   model call, server-side only
-components/                board, move list, analysis console, PGN input
-lib/stockfish.ts           Web Worker client for the engine
+app/api/explain/route.ts   model call, server side
+components/                board, move list, analysis panel, PGN input
+lib/stockfish.ts           Web Worker UCI client
 lib/classify.ts            move classification and eval formatting
-lib/prompts.ts             explanation prompts
-scripts/copy-stockfish.mjs postinstall copy from node_modules/stockfish
+lib/prompts.ts             prompts and template explanations
+scripts/copy-stockfish.mjs postinstall copy of the engine build
 ```
 
-## Licensing
+## License
 
-Stockfih's own code is MIT. The Stockfish engine files in `public/stockfish/`
-are **GPLv3**, from the [`stockfish`](https://www.npmjs.com/package/stockfish)
-npm package; their license text ships alongside them in `Copying.txt`.
-
-## Stack
-
-Next.js 16, React 19, TypeScript, Tailwind CSS 4, chess.js, react-chessboard,
-Stockfish 18 WASM.
+Stockfih's code is MIT. The Stockfish files in `public/stockfish/` are GPLv3,
+from the [`stockfish`](https://www.npmjs.com/package/stockfish) npm package,
+with their license in `Copying.txt`.

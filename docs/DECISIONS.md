@@ -141,3 +141,15 @@ root/depth/options, restricting only the second root via searchmoves. State
 finite-depth limitations and expose the searched reply as a continuation.
 This fulfills search interpretation; NNUE causal attribution remains outside
 this release. Export contains engine evidence only, never AI connection state.
+
+## 2026-10-17: Enrich facts while keeping narration constrained
+
+Add legally replayed searched replies, White-perspective root WDL, material
+counts and geometric attacks by the moved piece. Explicitly distinguish
+attacks from profitable captures, material from evaluation, and WDL from
+calibrated game probabilities. Models still select existing fact IDs only;
+unknown references and free prose fail visibly. Same-root comparisons supply
+concrete alternative/refutation evidence without inventing a tactical cause.
+Verified the browser interface against the Mac's cached Qwen3-VL-8B-Instruct
+Q4_K_M via llama.cpp on loopback, without a key. The owner waived live hosted
+BYOK testing; transport/credential/checker behavior is covered by tests.

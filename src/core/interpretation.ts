@@ -1,4 +1,4 @@
-import { Chess } from "chess.js";
+import { Chess, type Square } from "chess.js";
 import type { ParsedGameMove, PositionAnalysis } from "@/lib/types";
 
 export type MoveEvidence = {
@@ -33,6 +33,11 @@ function describe(fen: string, uci: string) {
   if (board.isCheckmate()) facts.push("This move delivers checkmate.");
   else if (board.isCheck()) facts.push("This move gives check.");
   if (board.isStalemate()) facts.push("This move produces stalemate.");
+  const attacked = board.board().flat().filter(piece => piece && piece.color !== move.color && piece.type !== "k" && board.attackers(piece.square as Square, move.color).includes(move.to));
+  if (attacked.length) facts.push(`From ${move.to}, the moved piece geometrically attacks ${attacked.map(piece => `${pieces[piece!.type]} on ${piece!.square}`).join(", ")}. Pins and replies may prevent a profitable capture.`);
+  const weights: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+  const material = board.board().flat().reduce((balance, piece) => balance + (piece ? weights[piece.type] * (piece.color === "w" ? 1 : -1) : 0), 0);
+  facts.push(`Material after this move: ${material === 0 ? "equal" : `${Math.abs(material)} points more for ${material > 0 ? "White" : "Black"}`} (pawn 1, minor piece 3, rook 5, queen 9). Material is not an evaluation.`);
   return { san: move.san, afterFen: board.fen(), facts };
 }
 
@@ -66,6 +71,8 @@ export function movesToInspect(position: PositionAnalysis | null, played: Parsed
     const sequence: string[] = [];
     for (const [ply, uci] of line.pv.entries()) {
       const move = describe(fen, uci);
+      const reply = line.pv[ply + 1];
+      const replySan = reply ? describe(move.afterFen, reply).san : null;
       sequence.push(move.san);
       targets.push({
         id: `pv:${position.fen}:${line.multipv}:${ply}:${uci}`,
@@ -75,7 +82,9 @@ export function movesToInspect(position: PositionAnalysis | null, played: Parsed
         facts: [
           ...move.facts,
           `Searched continuation through this move: ${sequence.join(" ")}.`,
-          `Stockfish candidate ${line.multipv}, searched to depth ${line.depth}.`,
+          `Stockfish candidate ${line.multipv}, searched to depth ${line.depth}${line.bound && line.bound !== "exact" ? `, ${line.bound} score bound` : ""}.`,
+          ...(replySan ? [`The next searched reply is ${replySan}. This reply is legal in the resulting position, not a guaranteed response.`] : []),
+          ...(line.wdl ? [`Root WDL per 1,000: White win ${line.wdl.win}, draw ${line.wdl.draw}, Black win ${line.wdl.loss}. This is the engine's outcome model, not a calibrated probability for this game.`] : []),
           score({ ...position, evaluation: line.score }, "Root line evaluation, not a separate evaluation of this ply"),
           "This is a searched continuation, not a guarantee of the opponent's move or a causal explanation of the network.",
         ],
@@ -135,7 +144,7 @@ export async function explainMove(
       temperature: 0,
       max_tokens: 120,
       messages: [
-        { role: "system", content: 'Select the evidence that best explains the selected chess move. Return only JSON {"facts":[0,1]} with unique zero-based evidence IDs, most useful first. Include the move fact (0). Never add prose, new moves, causes or facts. The evidence is computed by chess rules and Stockfish.' },
+        { role: "system", content: 'Select 2–6 evidence facts that best explain the selected chess move. Prefer concrete move effects, searched replies, score comparisons and outcome evidence over disclaimers. Return only JSON {"facts":[0,1]} with unique zero-based evidence IDs, most useful first. Include the move fact (0). Never add prose, new moves, causes or facts. The evidence is computed by chess rules and Stockfish.' },
         { role: "user", content: JSON.stringify({ move: target.label, facts: target.facts }) },
       ],
     }),

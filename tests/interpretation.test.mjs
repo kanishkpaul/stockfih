@@ -45,7 +45,7 @@ test("game moves remain inspectable when Stockfish has not analyzed them", () =>
   const moves = movesToInspect(null, played);
   assert.equal(moves.length, 1);
   assert.match(moves[0].facts[0], /White plays e4/);
-  assert.equal(moves[0].facts.length, 1);
+  assert(moves[0].facts.some(fact => fact.startsWith("Material after this move")));
 });
 
 test("analysis from another game cannot become explanation evidence", () => {
@@ -115,4 +115,17 @@ test("cancellation reaches the model request", async () => {
     assert.equal(options.signal.aborted, true);
     options.signal.throwIfAborted();
   }), { name: "AbortError" });
+});
+
+test("checked move effects distinguish geometric attacks from guaranteed gains", () => {
+  const board = new Chess("4k3/8/8/2q1n3/8/8/8/4K1N1 w - - 0 1");
+  const move = board.move("Nf3");
+  const target = movesToInspect(null, { ...move, beforeFen: move.before, afterFen: move.after, moveNumber: 1 })[0];
+  assert(target.facts.some(fact => fact.includes("knight on e5") && fact.includes("geometrically")));
+  assert(target.facts.some(fact => fact.includes("Material after this move")));
+});
+
+test("a searched reply is replayed from the selected ply's resulting position", () => {
+  const targets = movesToInspect(position, null);
+  assert(targets[0].facts.some(fact => fact.startsWith("The next searched reply is")));
 });

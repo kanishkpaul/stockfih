@@ -37,6 +37,7 @@ export function MoveInspector({ targets, targetId, onSelect }: {
     const controller = new AbortController();
     active.current = controller;
     setPending(identity);
+    setAnswer(null);
     setFailure(null);
     try {
       const text = await explainMove(target, connection, controller.signal);

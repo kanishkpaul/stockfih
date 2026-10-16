@@ -1,19 +1,23 @@
 import type { Color } from "chess.js";
 
 export type MoveClassification =
-  | "Brilliant"
-  | "Great"
   | "Best"
   | "Excellent"
   | "Good"
   | "Inaccuracy"
   | "Mistake"
-  | "Blunder";
+  | "Blunder"
+  | "Allows mate"
+  | "Unavailable";
 
 export type EngineScore = {
   type: "cp" | "mate";
   value: number;
+  winner?: Color;
 };
+
+export type Wdl = { win: number; draw: number; loss: number };
+export type Terminal = { kind: "mate"; winner: Color } | { kind: "draw"; reason: string };
 
 export type ParsedGameMove = {
   id: string;
@@ -49,6 +53,8 @@ export type EngineLine = {
   uci: string | null;
   san: string | null;
   pv: string[];
+  wdl?: Wdl;
+  bound?: "exact" | "lower" | "upper";
 };
 
 export type PositionAnalysis = {
@@ -58,6 +64,8 @@ export type PositionAnalysis = {
   bestMoveUci: string | null;
   bestMoveSan: string | null;
   lines: EngineLine[];
+  wdl?: Wdl;
+  terminal?: Terminal;
 };
 
 export type MoveAnalysis = {
@@ -70,4 +78,5 @@ export type MoveAnalysis = {
   lossCp: number | null;
   classification: MoveClassification;
   alternatives: EngineLine[];
+  expectedLoss?: number | null;
 };

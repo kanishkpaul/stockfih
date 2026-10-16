@@ -37,8 +37,8 @@ type AnalysisPanelProps = {
 };
 
 const badgeVariantByClassification = {
-  Brilliant: "accent",
-  Great: "accent",
+  Unavailable: "neutral",
+  "Allows mate": "danger",
   Best: "success",
   Excellent: "success",
   Good: "neutral",

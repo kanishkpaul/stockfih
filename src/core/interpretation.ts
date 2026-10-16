@@ -40,7 +40,7 @@ function score(position: PositionAnalysis, prefix: string) {
   const evaluation = position.evaluation;
   if (!evaluation) return `${prefix}: no engine evaluation is available.`;
   if (evaluation.type === "mate") {
-    if (evaluation.value === 0) return `${prefix}: terminal mate score; inspect the board for the winner.`;
+    if (evaluation.value === 0) return `${prefix}: ${evaluation.winner === "w" ? "White" : "Black"} has delivered checkmate.`;
     return `${prefix}: ${evaluation.value > 0 ? "White" : "Black"} has a searched mate in ${Math.abs(evaluation.value)}.`;
   }
   return `${prefix}: ${(evaluation.value / 100).toFixed(2)} pawns from White's perspective.`;

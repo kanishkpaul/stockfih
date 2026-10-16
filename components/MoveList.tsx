@@ -9,8 +9,8 @@ type MoveListProps = {
 };
 
 const moveClassStyles: Record<string, string> = {
-  Brilliant: "text-cyan-100 bg-cyan-300/14 border-cyan-300/25",
-  Great: "text-sky-100 bg-sky-400/14 border-sky-400/25",
+  Unavailable: "text-slate-100",
+  "Allows mate": "text-rose-100 bg-rose-500/14 border-rose-500/25",
   Best: "text-emerald-100 bg-emerald-400/14 border-emerald-400/25",
   Excellent: "text-emerald-100 bg-emerald-400/10 border-emerald-400/20",
   Good: "text-slate-100 bg-white/8 border-white/12",
@@ -33,15 +33,13 @@ export function MoveList({
     );
   }
 
-  const rows = [];
-
-  for (let index = 0; index < game.moves.length; index += 2) {
-    rows.push({
-      moveNumber: Math.floor(index / 2) + 1,
-      white: game.moves[index],
-      black: game.moves[index + 1],
-    });
+  const grouped = new Map<number, { moveNumber: number; white?: typeof game.moves[number]; black?: typeof game.moves[number] }>();
+  for (const move of game.moves) {
+    const row = grouped.get(move.moveNumber) ?? { moveNumber: move.moveNumber };
+    row[move.color === "w" ? "white" : "black"] = move;
+    grouped.set(move.moveNumber, row);
   }
+  const rows = [...grouped.values()];
 
   return (
     <div className="space-y-3">

@@ -33,7 +33,7 @@ export function parsePgn(pgn: string): ParsedGame {
   }
 
   const moves: ParsedGameMove[] = verboseMoves.map((move, index) => {
-    const moveNumber = Math.floor(index / 2) + 1;
+    const moveNumber = Number(move.before.split(" ")[5]);
     const moveUci = uciFromMove(move);
 
     return {
@@ -50,7 +50,7 @@ export function parsePgn(pgn: string): ParsedGame {
       captured: move.captured,
       beforeFen: move.before,
       afterFen: move.after,
-      isCapture: move.isCapture(),
+      isCapture: Boolean(move.captured),
       isCheck: move.san.includes("+") || move.san.includes("#"),
       isMate: move.san.includes("#"),
       isCastle: move.isKingsideCastle() || move.isQueensideCastle(),

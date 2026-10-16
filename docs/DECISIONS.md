@@ -108,3 +108,16 @@ worker is terminated instead of reusing its undrained UCI stream. The next
 job creates and handshakes a new worker. Game runs own AbortControllers;
 new imports and unmount abort them. Fixtures and controlled timers test
 serialization, late output, startup/readiness failures, crash and recovery.
+
+## 2026-10-16: Use explicit terminal states and outcome-based labels
+
+Normalize scores and UCI WDL to White. Parse terminal scores independently
+of PV and derive the winner/draw reason from legal chess state. Label moves
+by mover expected-score loss: <=1% Best, <=3% Excellent, <=7% Good,
+<=12% Inaccuracy, <=20% Mistake, otherwise Blunder; missing evidence is
+Unavailable, and newly allowing forced mate is explicit. These are
+transparent UI bands, not empirically calibrated measures of human skill.
+Keep cp swings as a separate descriptive statistic only when both scores
+are cp. Drop Brilliant/Great heuristics and artificial mate centipawns.
+Preserve real FEN fullmove numbering and en-passant captures. UCI regression
+fixtures are captured from the pinned engine with UCI_ShowWDL enabled.

@@ -4,80 +4,34 @@ import type {
   MoveClassification,
   ParsedGameMove,
   PositionAnalysis,
+  Wdl,
 } from "@/lib/types";
 
-const MATE_SCORE = 100_000;
-
-export function scoreToComparable(score: EngineScore | null) {
-  if (!score) {
-    return null;
-  }
-
-  if (score.type === "cp") {
-    return score.value;
-  }
-
-  const direction = score.value >= 0 ? 1 : -1;
-  return direction * (MATE_SCORE - Math.abs(score.value) * 1_000);
-}
-
-function scoreFromMoverPerspective(score: EngineScore | null, color: "w" | "b") {
-  const comparable = scoreToComparable(score);
-
-  if (comparable === null) {
-    return null;
-  }
-
-  return color === "w" ? comparable : -comparable;
+function expected(score: EngineScore | null, wdl?: Wdl) {
+  if (score?.type === "mate") return (score.winner ?? (score.value > 0 ? "w" : "b")) === "w" ? 1 : 0;
+  return wdl ? (wdl.win + wdl.draw / 2) / 1000 : null;
 }
 
 export function classifyMove(
   move: ParsedGameMove,
-  bestMoveUci: string | null,
-  evalBefore: EngineScore | null,
-  evalAfter: EngineScore | null,
+  evalBefore: EngineScore | null, evalAfter: EngineScore | null,
+  beforeWdl?: Wdl, afterWdl?: Wdl,
 ) {
-  const moverBefore = scoreFromMoverPerspective(evalBefore, move.color);
-  const moverAfter = scoreFromMoverPerspective(evalAfter, move.color);
-
-  const lossCp =
-    moverBefore === null || moverAfter === null
-      ? null
-      : Math.max(0, moverBefore - moverAfter);
-
-  let classification: MoveClassification;
-
-  if (lossCp === null) {
-    classification = bestMoveUci === `${move.from}${move.to}${move.promotion ?? ""}` ? "Best" : "Good";
-  } else if (lossCp <= 15) {
-    classification = "Best";
-  } else if (lossCp <= 35) {
-    classification = "Excellent";
-  } else if (lossCp <= 70) {
-    classification = "Good";
-  } else if (lossCp <= 130) {
-    classification = "Inaccuracy";
-  } else if (lossCp <= 250) {
-    classification = "Mistake";
-  } else {
-    classification = "Blunder";
+  const before = expected(evalBefore, beforeWdl);
+  const after = expected(evalAfter, afterWdl);
+  const expectedLoss = before === null || after === null ? null
+    : Math.max(0, move.color === "w" ? before - after : after - before);
+  const lossCp = evalBefore?.type === "cp" && evalAfter?.type === "cp"
+    ? Math.max(0, (evalBefore.value - evalAfter.value) * (move.color === "w" ? 1 : -1)) : null;
+  let classification: MoveClassification = "Unavailable";
+  if (expectedLoss !== null) {
+    classification = expectedLoss <= 0.01 ? "Best" : expectedLoss <= 0.03 ? "Excellent"
+      : expectedLoss <= 0.07 ? "Good" : expectedLoss <= 0.12 ? "Inaccuracy"
+      : expectedLoss <= 0.20 ? "Mistake" : "Blunder";
+    if (evalAfter?.type === "mate" && expectedLoss > 0 &&
+        (evalAfter.winner ?? (evalAfter.value > 0 ? "w" : "b")) !== move.color) classification = "Allows mate";
   }
-
-  const playedMoveUci = `${move.from}${move.to}${move.promotion ?? ""}`;
-
-  if (playedMoveUci === bestMoveUci && classification === "Best") {
-    if (move.isMate) {
-      classification = "Brilliant";
-    } else if (move.isCapture || move.isCheck || move.isCastle) {
-      classification = "Great";
-    }
-  }
-
-  return {
-    classification,
-    lossCp,
-    evalSwing: lossCp,
-  };
+  return { classification, lossCp, evalSwing: lossCp, expectedLoss };
 }
 
 export function buildMoveAnalysis(
@@ -85,11 +39,11 @@ export function buildMoveAnalysis(
   before: PositionAnalysis | undefined,
   after: PositionAnalysis | undefined,
 ): MoveAnalysis {
-  const { classification, lossCp, evalSwing } = classifyMove(
+  const { classification, lossCp, evalSwing, expectedLoss } = classifyMove(
     move,
-    before?.bestMoveUci ?? null,
     before?.evaluation ?? null,
     after?.evaluation ?? null,
+    before?.wdl, after?.wdl,
   );
 
   return {
@@ -99,6 +53,7 @@ export function buildMoveAnalysis(
     evalBefore: before?.evaluation ?? null,
     evalAfter: after?.evaluation ?? null,
     evalSwing,
+    expectedLoss,
     lossCp,
     classification,
     alternatives:
@@ -112,6 +67,7 @@ export function formatEval(score: EngineScore | null) {
   }
 
   if (score.type === "mate") {
+    if (score.value === 0) return score.winner === "w" ? "1–0" : "0–1";
     return `${score.value >= 0 ? "" : "-"}M${Math.abs(score.value)}`;
   }
 
@@ -125,11 +81,13 @@ export function formatEvalLong(score: EngineScore | null) {
   }
 
   if (score.type === "mate") {
+    if (score.value === 0) return `${score.winner === "w" ? "White" : "Black"} has delivered checkmate`;
     return score.value >= 0
       ? `White has mate in ${Math.abs(score.value)}`
       : `Black has mate in ${Math.abs(score.value)}`;
   }
 
+  if (score.value === 0) return "Engine evaluation is equal";
   const pawns = Math.abs(score.value / 100).toFixed(1);
   return score.value >= 0
     ? `White is better by ${pawns} pawns`
@@ -145,11 +103,9 @@ export function formatSwing(cp: number | null) {
 }
 
 export function scoreToBarPercentage(score: EngineScore | null) {
-  const comparable = scoreToComparable(score);
-
-  if (comparable === null) {
-    return 50;
-  }
+  if (!score) return 50;
+  if (score.type === "mate") return (score.winner ?? (score.value > 0 ? "w" : "b")) === "w" ? 100 : 0;
+  const comparable = score.value;
 
   const bounded = Math.atan(comparable / 350) / Math.PI + 0.5;
   return Math.max(0, Math.min(100, bounded * 100));

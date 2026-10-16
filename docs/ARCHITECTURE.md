@@ -79,3 +79,8 @@ CI check, with development-tooling exceptions recorded in DEPENDENCIES.md.
 startup/search has a deadline and AbortSignal; cancellation/error retires
 its worker, and messages from retired workers are ignored. Game review
 aborts its previous run before replacement and guards every publication.
+
+`src/core/uci.ts` parses scores, bounds and WDL independently of PV. It
+normalizes White's perspective and derives explicit terminal outcomes from
+chess.js. The classifier uses expected-score loss and reports unavailable
+when it lacks outcome evidence; it never turns mate distance into pawns.

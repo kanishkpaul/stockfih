@@ -1,5 +1,5 @@
-import { uciToSan } from "@/lib/chess";
-import type { EngineLine, EngineScore, PositionAnalysis } from "@/lib/types";
+import { parseInfo, positionResult } from "@/src/core/uci";
+import type { EngineLine, PositionAnalysis } from "@/lib/types";
 
 type Gate = { word: string; resolve: () => void; reject: (error: Error) => void; clean: () => void };
 type Search = {
@@ -107,6 +107,7 @@ export class StockfishClient {
     return this.enqueue(signal, () => new Promise<PositionAnalysis>((resolve, reject) => {
       this.search = { fen, depth, lines: new Map(), resolve, reject, clean: this.deadline(signal, 60_000, "Engine search") };
       this.worker!.postMessage("setoption name MultiPV value 3");
+      this.worker!.postMessage("setoption name UCI_ShowWDL value true");
       this.worker!.postMessage(`position fen ${fen}`);
       this.worker!.postMessage(`go depth ${depth}`);
     }));
@@ -123,19 +124,8 @@ export class StockfishClient {
     const pending = this.search;
     if (!pending) return;
     if (line.startsWith("info ")) {
-      const scoreMatch = line.match(/ score (cp|mate) (-?\d+)/);
-      const pvMatch = line.match(/ pv (.+)$/);
-      if (!scoreMatch || !pvMatch) return;
-      const pv = pvMatch[1].trim().split(/\s+/);
-      const multipv = Number(line.match(/ multipv (\d+)/)?.[1] ?? 1);
-      const score: EngineScore = {
-        type: scoreMatch[1] as "cp" | "mate",
-        value: Number(scoreMatch[2]) * (pending.fen.split(" ")[1] === "b" ? -1 : 1),
-      };
-      pending.lines.set(multipv, {
-        multipv, depth: Number(line.match(/ depth (\d+)/)?.[1] ?? pending.depth), score,
-        uci: pv[0], san: uciToSan(pending.fen, pv[0]), pv,
-      });
+      const parsed = parseInfo(line, pending.fen);
+      if (parsed) pending.lines.set(parsed.multipv, parsed);
     }
     if (line.startsWith("bestmove ")) {
       this.search = null;
@@ -143,10 +133,7 @@ export class StockfishClient {
       const uci = line.split(/\s+/)[1];
       const best = uci === "(none)" || uci === "0000" ? null : uci;
       const lines = [...pending.lines.values()].sort((a, b) => a.multipv - b.multipv);
-      pending.resolve({
-        fen: pending.fen, depth: pending.depth, lines, evaluation: lines[0]?.score ?? null,
-        bestMoveUci: best, bestMoveSan: uciToSan(pending.fen, best),
-      });
+      pending.resolve(positionResult(pending.fen, lines, best));
     }
   }
 }

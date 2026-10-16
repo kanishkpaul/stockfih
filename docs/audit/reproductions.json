@@ -1,0 +1,62 @@
+[
+  {
+    "id": "B01",
+    "detail": "Different positions share cache identity 2-g1f3:default"
+  },
+  {
+    "id": "B07",
+    "detail": {
+      "classification": "Blunder",
+      "lossCp": 2000,
+      "evalSwing": 2000
+    }
+  },
+  {
+    "id": "B08",
+    "detail": "Allows mate is represented as a 990-pawn score"
+  },
+  {
+    "id": "B09",
+    "detail": "+10 to +7 is a Blunder under fixed thresholds"
+  },
+  {
+    "id": "B10",
+    "detail": "No engine scores and no best move still returns Good"
+  },
+  {
+    "id": "B11",
+    "detail": "23...e5 is recorded as move 1; MoveList places it in the white column"
+  },
+  {
+    "id": "B12",
+    "detail": "En passant exd6 has isCapture=false"
+  },
+  {
+    "id": "B18",
+    "detail": "Missing best move produces a false claim that the played move matches it"
+  },
+  {
+    "id": "B13",
+    "detail": "Invalid FEN, move, classification, tone and missing scores return HTTP 200"
+  },
+  {
+    "id": "B14",
+    "detail": "The handler accepts a 1 MiB context without an application limit"
+  },
+  {
+    "id": "B06",
+    "detail": "mated: engine score discarded because terminal output has no PV"
+  },
+  {
+    "id": "B06",
+    "detail": "stalemate: engine score discarded because terminal output has no PV"
+  },
+  {
+    "id": "B05",
+    "detail": "Failed initialization is retained as the rejected initPromise"
+  },
+  {
+    "id": "B04",
+    "detail": "A timed-out white search completes the next black search with an illegal best move"
+  }
+]

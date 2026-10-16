@@ -1,0 +1,66 @@
+{
+  "package": "stockfish@18.0.7",
+  "depth": 4,
+  "handshake": [
+    "Stockfish 18 Lite WASM by the Stockfish developers (see AUTHORS file)",
+    "id name Stockfish 18 Lite WASM",
+    "id author the Stockfish developers (see AUTHORS file)",
+    "",
+    "option name Threads type spin default 1 min 1 max 1",
+    "option name Hash type spin default 16 min 1 max 33554432",
+    "option name Clear Hash type button",
+    "option name Ponder type check default false",
+    "option name MultiPV type spin default 1 min 1 max 256",
+    "option name Skill Level type spin default 20 min 0 max 20",
+    "option name Move Overhead type spin default 10 min 0 max 5000",
+    "option name nodestime type spin default 0 min 0 max 10000",
+    "option name UCI_Chess960 type check default false",
+    "option name UCI_LimitStrength type check default false",
+    "option name UCI_Elo type spin default 1320 min 1320 max 3190",
+    "option name UCI_ShowWDL type check default false",
+    "option name EvalFile type string default nn-9067e33176e8.nnue",
+    "option name EvalFileSmall type string default <empty>",
+    "uciok",
+    "readyok"
+  ],
+  "positions": {
+    "start": {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "lines": [
+        "info string NNUE evaluation using nn-9067e33176e8.nnue (11MiB, (22528, 256, 15, 32, 1))",
+        "info string Network replica 1: Local memory. Shared memory not supported by the OS. Local allocation fallback.",
+        "info depth 1 seldepth 2 multipv 1 score cp 7 nodes 89 nps 29666 hashfull 0 time 3 pv d2d4",
+        "info depth 1 seldepth 2 multipv 2 score cp -1 nodes 89 nps 29666 hashfull 0 time 3 pv e2e4",
+        "info depth 1 seldepth 2 multipv 3 score cp -6 nodes 89 nps 29666 hashfull 0 time 3 pv e2e3",
+        "info depth 2 seldepth 3 multipv 1 score cp 34 nodes 166 nps 55333 hashfull 0 time 3 pv d2d4",
+        "info depth 2 seldepth 3 multipv 2 score cp 21 nodes 166 nps 55333 hashfull 0 time 3 pv e2e4",
+        "info depth 2 seldepth 3 multipv 3 score cp 14 nodes 166 nps 55333 hashfull 0 time 3 pv e2e3",
+        "info depth 3 seldepth 4 multipv 1 score cp 51 nodes 344 nps 114666 hashfull 0 time 3 pv d2d4",
+        "info depth 3 seldepth 4 multipv 2 score cp 32 nodes 344 nps 114666 hashfull 0 time 3 pv e2e3",
+        "info depth 3 seldepth 4 multipv 3 score cp 26 nodes 344 nps 114666 hashfull 0 time 3 pv d2d3 d7d5",
+        "info depth 4 seldepth 9 multipv 1 score cp 33 nodes 2924 nps 584800 hashfull 0 time 5 pv e2e4 d7d5 e4e5 e7e6",
+        "info depth 4 seldepth 9 multipv 2 score cp 10 nodes 2924 nps 584800 hashfull 0 time 5 pv g1f3",
+        "info depth 4 seldepth 6 multipv 3 score cp 10 nodes 2924 nps 584800 hashfull 0 time 5 pv b1c3 d7d5 e2e4 d5e4 c3e4",
+        "bestmove e2e4 ponder d7d5"
+      ]
+    },
+    "mated": {
+      "fen": "r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4",
+      "lines": [
+        "info string NNUE evaluation using nn-9067e33176e8.nnue (11MiB, (22528, 256, 15, 32, 1))",
+        "info string Network replica 1: Local memory. Shared memory not supported by the OS. Local allocation fallback.",
+        "info depth 0 score mate 0",
+        "bestmove (none)"
+      ]
+    },
+    "stalemate": {
+      "fen": "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1",
+      "lines": [
+        "info string NNUE evaluation using nn-9067e33176e8.nnue (11MiB, (22528, 256, 15, 32, 1))",
+        "info string Network replica 1: Local memory. Shared memory not supported by the OS. Local allocation fallback.",
+        "info depth 0 score cp 0",
+        "bestmove (none)"
+      ]
+    }
+  }
+}

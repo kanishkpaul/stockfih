@@ -1,0 +1,38 @@
+name: attribution
+
+on:
+  push:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Commit messages
+        env:
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        # Only commits new to this push or pull request are checked. A new
+        # branch is compared against main, since `before` is all zeros then.
+        run: |
+          if [ -n "$BASE" ]; then
+            range="$BASE..$HEAD"
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            range="origin/main..$HEAD"
+          else
+            range="$BEFORE..$HEAD"
+          fi
+          git log --format=%B "$range" | sh scripts/check-attribution.sh
+
+      - name: Pull request title and body
+        if: github.event_name == 'pull_request'
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: printf '%s\n%s\n' "$TITLE" "$BODY" | sh scripts/check-attribution.sh

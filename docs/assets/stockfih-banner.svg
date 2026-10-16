@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="400" viewBox="0 0 1440 400" role="img" aria-labelledby="title desc">
+  <title id="title">Stockfih — Inside the search.</title>
+  <desc id="desc">A warm charcoal banner with a chessboard grid and branching green search paths.</desc>
+  <defs>
+    <pattern id="board" width="70" height="70" patternUnits="userSpaceOnUse"><rect width="70" height="70" fill="#e8d6b1"/><path d="M35 0h35v35H35zM0 35h35v35H0z" fill="#a58261"/></pattern>
+  </defs>
+  <rect width="1440" height="400" rx="12" fill="#171715"/>
+  <path d="M56 342H1384" stroke="#44443d"/>
+  <g font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif">
+    <text x="60" y="67" fill="#a9c78c" font-size="13" letter-spacing="3">CHESS ENGINE INTERPRETABILITY</text>
+    <text x="56" y="176" fill="#edede8" font-size="92" font-weight="650" letter-spacing="-5">Stockfih</text>
+    <text x="60" y="232" fill="#b4b4a9" font-size="30">Inside the search.</text>
+    <text x="60" y="293" fill="#edede8" font-size="17">Follow the line. Compare the move. Inspect the evidence.</text>
+    <text x="60" y="373" fill="#b4b4a9" font-size="12" letter-spacing="2">BROWSER STOCKFISH</text>
+    <text x="310" y="373" fill="#b4b4a9" font-size="12" letter-spacing="2">BYOK + LOCAL AI</text>
+    <text x="536" y="373" fill="#b4b4a9" font-size="12" letter-spacing="2">OPEN SOURCE</text>
+  </g>
+  <g transform="translate(884 32)">
+    <rect width="280" height="280" fill="url(#board)" opacity=".25"/>
+    <g fill="none" stroke="#a9c78c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 260V220L60 180V140L100 100V60L140 20"/>
+      <path d="M60 180L140 180L180 140V100L220 60" opacity=".65"/>
+      <path d="M100 100H180L220 140H260" opacity=".4"/>
+    </g>
+    <g fill="#a9c78c" stroke="#171715" stroke-width="3"><circle cx="20" cy="260" r="7"/><circle cx="60" cy="180" r="7"/><circle cx="100" cy="100" r="7"/><circle cx="140" cy="20" r="7"/><circle cx="220" cy="60" r="7"/><circle cx="260" cy="140" r="7"/></g>
+    <path d="M290 20h150M290 100h100M290 180h125M290 260h75" stroke="#44443d" stroke-width="2"/>
+    <path d="M290 20h82M290 100h48M290 180h65M290 260h32" stroke="#a9c78c" stroke-width="2" opacity=".7"/>
+  </g>
+</svg>

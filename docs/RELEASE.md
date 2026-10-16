@@ -60,6 +60,7 @@ Milestones 1–4 are implemented: engine lifecycle/chess truth, independent
 Review/Explore, depth/counterfactual/export evidence and richer checked facts
 with a real local model. Milestone 5 is covered by the release checks and
 AUDIT-STATUS.md; remote CI status is recorded with the final publication.
-Milestone 6 includes DEMO.md, screenshots/recording and preview deployment.
+Milestone 6 has DEMO.md and screenshots/recording. Hosted preview deployment
+is pending valid Vercel authentication; see VALIDATION.md.
 Production promotion and final tagging wait for owner review of that preview.
 Do not call a deployment remotely accepted until it has been reviewed.

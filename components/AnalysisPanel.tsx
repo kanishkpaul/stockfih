@@ -1,4 +1,4 @@
-import { Bot, BrainCircuit, Sparkles } from "lucide-react";
+import { BrainCircuit } from "lucide-react";
 
 import { EvalBar } from "@/components/EvalBar";
 import { Badge } from "@/components/ui/badge";
@@ -11,17 +11,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { MoveInspector } from "@/components/MoveInspector";
 import { formatEval, formatSwing } from "@/lib/classify";
 import type {
-  ExplainTone,
-  ExplanationResult,
+  PositionAnalysis,
   MoveAnalysis,
   ParsedGameMove,
 } from "@/lib/types";
 
 type AnalysisPanelProps = {
-  activeTone: ExplainTone;
   analysisError: string | null;
   analysisProgress: {
     completed: number;
@@ -30,11 +28,9 @@ type AnalysisPanelProps = {
   };
   analysisStatus: "idle" | "loading" | "done" | "error";
   depth: 8 | 10 | 12 | 14;
-  explanation: ExplanationResult | null;
-  explanationLoading: boolean;
   onAnalyze: () => void;
   onChangeDepth: (depth: 8 | 10 | 12 | 14) => void;
-  onExplain: (tone: ExplainTone) => void;
+  currentPositionAnalysis: PositionAnalysis | null;
   selectedAnalysis: MoveAnalysis | null;
   selectedMove: ParsedGameMove | null;
 };
@@ -51,18 +47,15 @@ const badgeVariantByClassification = {
 } as const;
 
 export function AnalysisPanel({
-  activeTone,
   analysisError,
   analysisProgress,
   analysisStatus,
   depth,
-  explanation,
-  explanationLoading,
   onAnalyze,
   onChangeDepth,
-  onExplain,
   selectedAnalysis,
   selectedMove,
+  currentPositionAnalysis,
 }: AnalysisPanelProps) {
   const progress =
     analysisProgress.total > 0
@@ -79,8 +72,7 @@ export function AnalysisPanel({
               Analysis Console
             </CardTitle>
             <CardDescription>
-              Engine classifications, eval swing, and AI coaching layered onto the
-              selected move.
+              Stockfish scores, candidate lines and checked move evidence.
             </CardDescription>
           </div>
           <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
@@ -142,8 +134,7 @@ export function AnalysisPanel({
 
         {!selectedMove ? (
           <div className="rounded-3xl border border-dashed border-white/12 bg-white/4 p-6 text-sm text-slate-400">
-            Select a move from the list to inspect its classification and generate a
-            coaching explanation.
+            Select a game move, or inspect Stockfish’s candidate lines below.
           </div>
         ) : !selectedAnalysis ? (
           <div className="space-y-3 rounded-3xl border border-dashed border-white/12 bg-white/4 p-6">
@@ -200,70 +191,10 @@ export function AnalysisPanel({
               </div>
             </div>
 
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant={activeTone === "default" ? "default" : "secondary"}
-                  onClick={() => onExplain("default")}
-                  disabled={explanationLoading}
-                >
-                  <Bot className="mr-2 size-4" />
-                  Explain this move
-                </Button>
-                <Button
-                  size="sm"
-                  variant={activeTone === "1200" ? "default" : "secondary"}
-                  onClick={() => onExplain("1200")}
-                  disabled={explanationLoading}
-                >
-                  <Sparkles className="mr-2 size-4" />
-                  Explain like I&apos;m 1200
-                </Button>
-                <Button
-                  size="sm"
-                  variant={activeTone === "tactical" ? "default" : "secondary"}
-                  onClick={() => onExplain("tactical")}
-                  disabled={explanationLoading}
-                >
-                  <BrainCircuit className="mr-2 size-4" />
-                  Explain tactically
-                </Button>
-              </div>
-
-              {explanationLoading ? (
-                <div className="space-y-3 rounded-3xl border border-white/8 bg-white/4 p-5">
-                  <Skeleton className="h-4 w-2/5" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-11/12" />
-                  <Skeleton className="h-4 w-9/12" />
-                </div>
-              ) : explanation ? (
-                <div className="rounded-3xl border border-white/8 bg-white/4 p-5">
-                  <div className="mb-3 flex flex-wrap items-center gap-2">
-                    <Badge variant="neutral">
-                      {explanation.source === "huggingface"
-                        ? explanation.model ?? "Hugging Face"
-                        : "Deterministic fallback"}
-                    </Badge>
-                    <Badge variant="accent">{activeTone}</Badge>
-                  </div>
-                  <div className="whitespace-pre-wrap text-sm leading-7 text-slate-100">
-                    {explanation.text}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-3xl border border-dashed border-white/12 bg-white/4 p-5 text-sm text-slate-400">
-                  Ask for an explanation to turn the engine verdict into position-aware
-                  coaching. If `HF_TOKEN` is unset, Stockfih falls back to a local
-                  template.
-                </div>
-              )}
-            </div>
           </>
         )}
+        <Separator />
+        <MoveInspector position={currentPositionAnalysis} played={selectedMove} />
       </CardContent>
     </Card>
   );

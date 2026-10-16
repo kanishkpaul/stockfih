@@ -10,8 +10,6 @@ export type MoveClassification =
   | "Mistake"
   | "Blunder";
 
-export type ExplainTone = "default" | "1200" | "tactical";
-
 export type EngineScore = {
   type: "cp" | "mate";
   value: number;
@@ -72,23 +70,4 @@ export type MoveAnalysis = {
   lossCp: number | null;
   classification: MoveClassification;
   alternatives: EngineLine[];
-};
-
-export type ExplanationResult = {
-  text: string;
-  tone: ExplainTone;
-  source: "huggingface" | "template";
-  model?: string;
-  createdAt: number;
-};
-
-export type ExplainRoutePayload = {
-  fen: string;
-  playedMove: string;
-  bestMove: string | null;
-  evalBefore: EngineScore | null;
-  evalAfter: EngineScore | null;
-  classification: MoveClassification;
-  pgnContext: string;
-  tone: ExplainTone;
 };

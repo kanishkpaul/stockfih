@@ -18,6 +18,11 @@ invalidates displayed answers. No persistent explanation cache is used.
 The old shared-token `/api/explain` returns 410; its prompt/template module
 is removed. `npm test` checks the new evidence/client contract.
 
+The inspector is mounted in `AnalysisPanel`. `StockfihApp` supplies the
+current position and selected game move. Inspector selections expose their
+before-FEN without moving the replay board; synchronizing that board is a
+remaining v1 task. Game import is collapsed above the workspace.
+
 The model returns fact IDs; code rejects unknown references and extra prose,
 then renders known facts. It cannot introduce a move, evaluation or tactical
 cause. Legal replay is not proof that engine evidence is correct: engine

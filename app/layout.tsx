@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Stockfih",
-  description: "Stockfish, but it tells you what you were supposed to see.",
+  description: "Inspect Stockfish’s candidate lines and the evidence behind each move.",
 };
 
 export default function RootLayout({

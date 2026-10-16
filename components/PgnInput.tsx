@@ -37,8 +37,7 @@ export function PgnInput({
               PGN Intake
             </CardTitle>
             <CardDescription>
-              Paste a PGN, load the sample game, and let Stockfih turn raw engine
-              output into coaching.
+              Paste a PGN or load the sample game to inspect Stockfish’s analysis.
             </CardDescription>
           </div>
           <Button size="sm" variant="secondary" onClick={onLoadSample}>
@@ -48,7 +47,9 @@ export function PgnInput({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <label htmlFor="pgn-input">Game PGN</label>
         <Textarea
+          id="pgn-input"
           value={pgn}
           onChange={(event) => onPgnChange(event.target.value)}
           placeholder={`[Event "Club Night"]\n1. e4 e5 2. Nf3 ...`}

@@ -80,3 +80,12 @@ and chess evidence. Explaining a played move or Stockfish continuation is
 interpretation of that evidence, not a tutoring feature. Review and Explore
 are inspection workflows; search traces and network experiments deepen
 interpretability. Historical audit records retain their original wording.
+
+## 2026-10-16: Replace the legacy explanation controls
+
+Mount the move inspector in the existing analysis panel, retire the old
+shared-token route and template module, and remove the persistent
+explanation cache. Keep model configuration in the inspector's tab memory.
+Collapse import and remove the promotional header/feature cards so the
+workspace leads. This is an incremental interface change; the complete
+neutral theme and synchronized board inspection remain release work.

@@ -1,32 +1,24 @@
 "use client";
 
-import { startTransition, useEffect, useEffectEvent, useMemo, useState } from "react";
-import { Cpu, Keyboard, ScanSearch } from "lucide-react";
+import { startTransition, useEffect, useEffectEvent, useState } from "react";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { ChessBoardPanel } from "@/components/ChessBoardPanel";
 import { MoveList } from "@/components/MoveList";
 import { PgnInput } from "@/components/PgnInput";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { buildMoveAnalysis } from "@/lib/classify";
 import {
-  buildPgnContext,
   DEFAULT_FEN,
   parsePgn,
   SAMPLE_PGN,
 } from "@/lib/chess";
-import { buildFallbackExplanation } from "@/lib/prompts";
 import { getStockfishClient } from "@/lib/stockfish";
 import type {
-  ExplainTone,
-  ExplanationResult,
   MoveAnalysis,
   ParsedGame,
   PositionAnalysis,
 } from "@/lib/types";
-
-const EXPLANATION_CACHE_KEY = "stockfih:explanations:v1";
 
 function createInitialGame() {
   try {
@@ -52,28 +44,6 @@ export function StockfihApp() {
   const [depth, setDepth] = useState<8 | 10 | 12 | 14>(10);
   const [positionAnalyses, setPositionAnalyses] = useState<Record<number, PositionAnalysis>>({});
   const [moveAnalyses, setMoveAnalyses] = useState<Record<number, MoveAnalysis>>({});
-  const [explanationCache, setExplanationCache] = useState<Record<string, ExplanationResult>>(
-    () => {
-      if (typeof window === "undefined") {
-        return {};
-      }
-
-      try {
-        const cached = window.localStorage.getItem(EXPLANATION_CACHE_KEY);
-        return cached ? (JSON.parse(cached) as Record<string, ExplanationResult>) : {};
-      } catch {
-        window.localStorage.removeItem(EXPLANATION_CACHE_KEY);
-        return {};
-      }
-    },
-  );
-  const [activeTone, setActiveTone] = useState<ExplainTone>("default");
-  const [explainingKey, setExplainingKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    localStorage.setItem(EXPLANATION_CACHE_KEY, JSON.stringify(explanationCache));
-  }, [explanationCache]);
-
   const selectedMove =
     game && selectedPly > 0 ? game.moves[selectedPly - 1] : null;
   const selectedAnalysis =
@@ -84,11 +54,6 @@ export function StockfihApp() {
     DEFAULT_FEN;
   const currentPositionAnalysis = positionAnalyses[selectedPly] ?? null;
 
-  const explanationKey = selectedMove ? `${selectedMove.id}:${activeTone}` : null;
-  const selectedExplanation = explanationKey
-    ? explanationCache[explanationKey] ?? null
-    : null;
-
   const handleKeyboardNavigation = useEffectEvent((event: KeyboardEvent) => {
     const target = event.target as HTMLElement | null;
 
@@ -96,16 +61,20 @@ export function StockfihApp() {
       !game ||
       target?.tagName === "TEXTAREA" ||
       target?.tagName === "INPUT" ||
+      target?.tagName === "SELECT" ||
+      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
       target?.isContentEditable
     ) {
       return;
     }
 
     if (event.key === "ArrowRight") {
+      event.preventDefault();
       setSelectedPly((current) => Math.min(game.moves.length, current + 1));
     }
 
     if (event.key === "ArrowLeft") {
+      event.preventDefault();
       setSelectedPly((current) => Math.max(0, current - 1));
     }
   });
@@ -114,27 +83,6 @@ export function StockfihApp() {
     window.addEventListener("keydown", handleKeyboardNavigation);
     return () => window.removeEventListener("keydown", handleKeyboardNavigation);
   }, []);
-
-  const metricCards = useMemo(
-    () => [
-      {
-        icon: Cpu,
-        label: "Engine-native review",
-        copy: "Client-side Stockfish with per-position eval, best move, and MultiPV alternatives.",
-      },
-      {
-        icon: ScanSearch,
-        label: "LLM coaching layer",
-        copy: "A protected Hugging Face route translates search output into human explanations.",
-      },
-      {
-        icon: Keyboard,
-        label: "Fast replay UX",
-        copy: "Arrow-key navigation, board flipping, move selection, progress states, and caching.",
-      },
-    ],
-    [],
-  );
 
   function resetAnalysisState() {
     setAnalysisStatus("idle");
@@ -146,7 +94,6 @@ export function StockfihApp() {
     });
     setPositionAnalyses({});
     setMoveAnalyses({});
-    setActiveTone("default");
   }
 
   function loadGame(rawPgn: string) {
@@ -177,18 +124,12 @@ export function StockfihApp() {
     setMoveAnalyses({});
 
     try {
-      // eslint-disable-next-line no-console
-      console.debug("handleAnalyzeGame: starting analysis");
       const client = getStockfishClient();
       const positions = [game.initialFen, ...game.moves.map((move) => move.afterFen)];
-      // eslint-disable-next-line no-console
-      console.debug("handleAnalyzeGame: positions length", positions.length);
       const nextPositionAnalyses: Record<number, PositionAnalysis> = {};
       const nextMoveAnalyses: Record<number, MoveAnalysis> = {};
 
       await client.newGame();
-      // eslint-disable-next-line no-console
-      console.debug("handleAnalyzeGame: client.newGame resolved");
       setAnalysisProgress({
         completed: 0,
         currentMove: game.moves[0]?.san ?? "Initial position",
@@ -234,111 +175,16 @@ export function StockfihApp() {
     }
   }
 
-  async function handleExplain(tone: ExplainTone) {
-    if (!game || !selectedMove || !selectedAnalysis) {
-      return;
-    }
-
-    setActiveTone(tone);
-
-    const cacheKey = `${selectedMove.id}:${tone}`;
-
-    if (explanationCache[cacheKey]) {
-      return;
-    }
-
-    const payload = {
-      fen: selectedMove.beforeFen,
-      playedMove: selectedMove.san,
-      bestMove: selectedAnalysis.bestMoveSan,
-      evalBefore: selectedAnalysis.evalBefore,
-      evalAfter: selectedAnalysis.evalAfter,
-      classification: selectedAnalysis.classification,
-      pgnContext: buildPgnContext(game, selectedMove.index),
-      tone,
-    } as const;
-
-    setExplainingKey(cacheKey);
-
-    try {
-      const response = await fetch("/api/explain", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error("The explanation route returned an error.");
-      }
-
-      const data = (await response.json()) as {
-        explanation: string;
-        model?: string;
-        source: "huggingface" | "template";
-      };
-
-      setExplanationCache((current) => ({
-        ...current,
-        [cacheKey]: {
-          createdAt: Date.now(),
-          model: data.model,
-          source: data.source,
-          text: data.explanation,
-          tone,
-        },
-      }));
-    } catch {
-      setExplanationCache((current) => ({
-        ...current,
-        [cacheKey]: {
-          createdAt: Date.now(),
-          source: "template",
-          text: buildFallbackExplanation(payload),
-          tone,
-        },
-      }));
-    } finally {
-      setExplainingKey(null);
-    }
-  }
-
   return (
     <main className="min-h-screen">
       <section className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-        <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
-          <Card className="overflow-hidden">
-            <CardContent className="p-6 sm:p-8">
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="accent">Stockfih</Badge>
-                <Badge variant="neutral">Frontier-lab chess analysis</Badge>
-              </div>
-              <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                Stockfish, but it tells you what you were supposed to see.
-              </h1>
-              <p className="mt-4 max-w-3xl text-balance text-lg leading-8 text-slate-300">
-                Upload a PGN, replay the game on an interactive board, score every
-                move with Stockfish, and then ask an LLM coach to translate engine
-                truth into human advice.
-              </p>
-            </CardContent>
-          </Card>
-          <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-1">
-            {metricCards.map(({ icon: Icon, label, copy }) => (
-              <Card key={label}>
-                <CardContent className="p-5">
-                  <div className="mb-4 flex size-11 items-center justify-center rounded-2xl border border-cyan-300/16 bg-cyan-300/10">
-                    <Icon className="size-5 text-cyan-100" />
-                  </div>
-                  <h2 className="text-base font-semibold text-white">{label}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">{copy}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+        <header className="workspace-header">
+          <h1>Stockfih</h1>
+          <p>Inspect the game. Follow Stockfish’s lines. Explain the evidence.</p>
+        </header>
 
+        <details className="workspace-import">
+          <summary>Import a game</summary>
         <PgnInput
           error={parseError}
           headers={game?.headers ?? null}
@@ -347,6 +193,7 @@ export function StockfihApp() {
           onPgnChange={setPgnInput}
           pgn={pgnInput}
         />
+        </details>
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_360px_minmax(340px,420px)]">
           <ChessBoardPanel
@@ -381,20 +228,15 @@ export function StockfihApp() {
           </Card>
 
           <AnalysisPanel
-            activeTone={activeTone}
             analysisError={analysisError}
             analysisProgress={analysisProgress}
             analysisStatus={analysisStatus}
             depth={depth}
-            explanation={selectedExplanation}
-            explanationLoading={Boolean(
-              explanationKey && explainingKey && explanationKey === explainingKey,
-            )}
             onAnalyze={handleAnalyzeGame}
             onChangeDepth={setDepth}
-            onExplain={handleExplain}
             selectedAnalysis={selectedAnalysis}
             selectedMove={selectedMove}
+            currentPositionAnalysis={currentPositionAnalysis}
           />
         </div>
       </section>

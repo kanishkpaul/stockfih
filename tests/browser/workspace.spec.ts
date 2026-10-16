@@ -77,3 +77,25 @@ test("cancelled startup is visible and a new run can recover", async ({ page }) 
   await page.getByRole("button", { name: "Analyze Game", exact: true }).click();
   await expect(page.getByRole("status", { name: "Analysis status", exact: true })).toContainText("Analysis complete", { timeout: 60_000 });
 });
+
+test("depth inspection, same-root comparison and trace export work with the shipped engine", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore", exact: true }).click();
+  await page.getByLabel("Depth", { exact: true }).selectOption("8");
+  await page.getByRole("button", { name: "Analyze position", exact: true }).click();
+  await expect(page.getByRole("status", { name: "Analysis status", exact: true })).toContainText("complete");
+  await page.getByText(/Search by depth ·/).click();
+  await page.getByRole("button", { name: "4", exact: true }).click();
+  await expect(page.getByText("Inspecting depth 4", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Compare selected move", exact: true }).click();
+  await expect(page.getByLabel("Checked evidence")).toContainText("Restricting the root", { timeout: 30_000 });
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export trace", exact: true }).click();
+  const download = await downloaded;
+  const stream = await download.createReadStream(); const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  const trace = JSON.parse(Buffer.concat(chunks).toString());
+  expect(trace.schema).toBe("stockfih.search-trace.v1");
+  expect(trace.comparison.restricted.provenance.rootMove).toBeTruthy();
+  expect(trace.position.trace).toHaveLength(8);
+});

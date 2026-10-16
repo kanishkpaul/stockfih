@@ -1,9 +1,11 @@
+import { Chess } from "chess.js";
+import * as engine from "@/public/stockfish/manifest.json";
 import { parseInfo, positionResult } from "@/src/core/uci";
-import type { EngineLine, PositionAnalysis } from "@/lib/types";
+import type { EngineLine, PositionAnalysis, SearchFrame } from "@/lib/types";
 
 type Gate = { word: string; resolve: () => void; reject: (error: Error) => void; clean: () => void };
 type Search = {
-  fen: string; depth: number; lines: Map<number, EngineLine>;
+  fen: string; depth: number; rootMove: string | null; lines: Map<number, EngineLine>; frames: Map<number, SearchFrame>;
   resolve: (analysis: PositionAnalysis) => void; reject: (error: Error) => void;
   clean: () => void;
 };
@@ -103,13 +105,18 @@ export class StockfishClient {
     });
   }
 
-  analyzePosition(fen: string, depth: number, signal?: AbortSignal): Promise<PositionAnalysis> {
+  analyzePosition(fen: string, depth: number, signal?: AbortSignal, rootMove: string | null = null): Promise<PositionAnalysis> {
+    const board = new Chess(fen);
+    if (!Number.isInteger(depth) || depth < 1 || depth > 24) return Promise.reject(new Error("Depth must be 1–24."));
+    if (rootMove && !board.moves({ verbose: true }).some(move => move.lan === rootMove)) return Promise.reject(new Error("Comparison move is illegal."));
     return this.enqueue(signal, () => new Promise<PositionAnalysis>((resolve, reject) => {
-      this.search = { fen, depth, lines: new Map(), resolve, reject, clean: this.deadline(signal, 60_000, "Engine search") };
+      this.search = { fen, depth, rootMove, frames: new Map(), lines: new Map(), resolve, reject, clean: this.deadline(signal, 60_000, "Engine search") };
+      this.worker!.postMessage("setoption name Threads value 1");
+      this.worker!.postMessage("setoption name Hash value 16");
       this.worker!.postMessage("setoption name MultiPV value 3");
       this.worker!.postMessage("setoption name UCI_ShowWDL value true");
       this.worker!.postMessage(`position fen ${fen}`);
-      this.worker!.postMessage(`go depth ${depth}`);
+      this.worker!.postMessage(`go depth ${depth}${rootMove ? ` searchmoves ${rootMove}` : ""}`);
     }));
   }
 
@@ -125,7 +132,14 @@ export class StockfishClient {
     if (!pending) return;
     if (line.startsWith("info ")) {
       const parsed = parseInfo(line, pending.fen);
-      if (parsed) pending.lines.set(parsed.multipv, parsed);
+      if (parsed) {
+        pending.lines.set(parsed.multipv, parsed);
+        const frame = pending.frames.get(parsed.depth) ?? { depth: parsed.depth, lines: [], nodes: 0, milliseconds: 0 };
+        frame.lines = [...frame.lines.filter(previous => previous.multipv !== parsed.multipv), parsed].sort((a, b) => a.multipv - b.multipv);
+        frame.nodes = Number(line.match(/ nodes (\d+)/)?.[1] ?? frame.nodes);
+        frame.milliseconds = Number(line.match(/ time (\d+)/)?.[1] ?? frame.milliseconds);
+        pending.frames.set(parsed.depth, frame);
+      }
     }
     if (line.startsWith("bestmove ")) {
       this.search = null;
@@ -133,7 +147,10 @@ export class StockfishClient {
       const uci = line.split(/\s+/)[1];
       const best = uci === "(none)" || uci === "0000" ? null : uci;
       const lines = [...pending.lines.values()].sort((a, b) => a.multipv - b.multipv);
-      pending.resolve(positionResult(pending.fen, lines, best));
+      pending.resolve({ ...positionResult(pending.fen, lines, best),
+        trace: [...pending.frames.values()].sort((a, b) => a.depth - b.depth),
+        provenance: { engine, requestedDepth: pending.depth, multiPv: 3, threads: 1, hashMb: 16, showWdl: true, rootMove: pending.rootMove },
+      });
     }
   }
 }

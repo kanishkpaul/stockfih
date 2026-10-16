@@ -57,6 +57,10 @@ export type EngineLine = {
   bound?: "exact" | "lower" | "upper";
 };
 
+export type SearchFrame = { depth: number; lines: EngineLine[]; nodes: number; milliseconds: number };
+export type Provenance = { engine: { package: string; version: string; assets: Record<string, string> }; requestedDepth: number; multiPv: number; threads: number; hashMb: number; showWdl: boolean; rootMove: string | null };
+export type MoveComparison = { fen: string; uci: string; unrestricted: PositionAnalysis; restricted: PositionAnalysis };
+
 export type PositionAnalysis = {
   fen: string;
   depth: number;
@@ -66,6 +70,8 @@ export type PositionAnalysis = {
   lines: EngineLine[];
   wdl?: Wdl;
   terminal?: Terminal;
+  trace?: SearchFrame[];
+  provenance?: Provenance;
 };
 
 export type MoveAnalysis = {

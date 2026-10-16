@@ -117,3 +117,8 @@ footer { margin-top: var(--space-6); border-top: 1px solid var(--border); paddin
   .analysis-rail > section + section { margin-top: 0; border-top: 0; padding-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+.trace-scroll { overflow-x: auto; }
+.search-trace table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.search-trace th, .search-trace td { padding: .3rem; text-align: left; border-bottom: 1px solid var(--border); }
+.search-trace button { color: var(--accent); background: transparent; border: 1px solid var(--border); cursor: pointer; }
+.search-trace button[aria-pressed=true] { background: var(--accent); color: var(--accent-ink); }

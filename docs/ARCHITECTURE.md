@@ -1,94 +1,67 @@
 # Web architecture
 
-Next.js App Router serves React. The product is exclusively engine interpretation,
-with optional BYOK/local AI. The desktop design on local `new` is parked.
+Next.js App Router serves a React chess workspace. Stockfish runs in a local
+browser Worker. Review and Explore have equal priority; interpretation is the
+sole scope. The desktop branch `new` stays local. No tutoring subsystem exists.
 
-## Current implementation
+## Ownership and boundaries
 
-`components/StockfihApp.tsx` owns game and engine-analysis state.
-`lib/chess.ts` wraps chess.js; `lib/stockfish.ts` owns the browser UCI Worker;
-`lib/classify.ts` supplies legacy move labels. Their known lifecycle and
-classification defects are tracked in `BUG-FIX-PLAN.md`.
+`StockfihApp` composes the immutable imported game, independent exploration
+history, analysis snapshots and selection. `src/core/exploration.ts` validates
+FEN and legal moves; branching discards redo without altering the game.
+`lib/chess.ts`, `lib/classify.ts` and `lib/types.ts` are shared legacy modules
+migrated only as repairs require. Features import core, never other features;
+core never imports feature UI. There is no speculative feature registry.
 
-`src/core/interpretation.ts` replays game and PV moves into checked facts and
-owns the direct browser chat-completions client. `MoveInspector` owns model
-settings, target selection and request lifetime. Keys remain in component
-memory. Changing target/evidence/configuration aborts in-flight work and
-invalidates displayed answers. No persistent explanation cache is used.
-The old shared-token `/api/explain` returns 410; its prompt/template module
-is removed. `npm test` checks the new evidence/client contract.
+`src/core/engine.ts` owns one serialized UCI lane. Startup/search deadlines,
+AbortSignal and worker retirement isolate jobs. Retired-worker messages cannot
+finish later jobs. Game replacement and exploration changes abort active work.
+`src/core/uci.ts` parses score independently of PV, preserves bounds and
+normalizes scores/WDL to White. Explicit legal terminal outcomes prevent mate
+zero from losing its winner. Classification uses mover expected-score loss;
+missing evidence is unavailable and mate is never converted to centipawns.
 
-The inspector is mounted in `AnalysisPanel`. `StockfihApp` supplies the
-current position and selected game move. Inspector selections expose their
-before-FEN without moving the replay board; synchronizing that board is a
-remaining v1 task. Game import is collapsed above the workspace.
+## Search interpretation
 
-The model returns fact IDs; code rejects unknown references and extra prose,
-then renders known facts. It cannot introduce a move, evaluation or tactical
-cause. Legal replay is not proof that engine evidence is correct: engine
-lifecycle/provenance repairs remain prerequisites for deeper interpretation.
-Root-line scores are labelled separately from individual PV-ply positions.
+Each completed snapshot retains reported depth frames with MultiPV, nodes and
+elapsed milliseconds. Provenance records package/assets, requested depth,
+Threads, Hash, MultiPV, WDL and optional root restriction. Frames are actual
+engine observations, not reconstructed thinking. Incomplete MultiPV at a depth
+remains visible as incomplete evidence. Final lines may have different depths.
 
-## Model boundary
+A comparison clears search history before each of two searches at the same
+root and settings: unrestricted, then `searchmoves` restricted to the selected
+legal move. The restricted PV exposes the searched opponent reply. Finite-depth
+scores can differ even for the same move. This is a counterfactual search,
+not proof of a causal network explanation. JSON export includes snapshots,
+trace and comparison; it has no model configuration or credentials.
 
-Requests contain only selected-move evidence and go directly to the chosen
-HTTPS or loopback endpoint. BYOK is transient tab state; it is never stored,
-embedded, logged or sent through the app server. No automatic requests.
-Provider errors are visible, requests are cancellable with a 30-second
-limit, and outputs are capped at 120 tokens. Browser CORS/private-network
-policy limits compatibility. A future relay requires an explicit access
-and destination policy; do not introduce an arbitrary-URL server proxy.
+## Checked AI boundary
 
-## Planned boundaries
+`src/core/interpretation.ts` legally replays every game/PV move into facts.
+`src/core/search-trace.ts` adds comparison facts only when FEN and UCI match.
+The model selects fact IDs; code rejects unknown IDs, duplicates, extra prose
+and missing target-move references, then renders the known text. Root scores
+are never presented as separate evaluations of intermediate PV plies.
 
-Migrate incrementally into core chess, engine, interpretation and storage
-modules as repair groups require them. Review and Explore features import
-only core, never one another; core never imports a feature. The current
-core temporarily imports legacy shared types from `lib/types.ts`.
-Application composition wires features together. Do not invent a feature
-registry or create empty folders before an actual task needs them.
+`MoveInspector` owns transient connection settings and request lifetime.
+Changing target/evidence/configuration invalidates answers and aborts requests.
+Keys stay in React tab memory and go directly to the chosen HTTPS or loopback
+origin. No persistence, server proxy, shared key, automatic calls or silent
+fallback. Requests omit credentials/referrer, reject redirects, cap output at
+120 tokens and time out after 30 seconds. Browser CORS/local-network policy
+limits provider compatibility. The retired `/api/explain` returns 410.
 
-Stable game/run identities and AbortSignal ownership must prevent old
-results from publishing into a new session. Future evidence snapshots need
-engine build/options, actual depth, perspective, WDL/score/bounds, position,
-terminal state and legal lines. Search traces and tested chess features
-precede optional NNUE interventions. Static eval is not piece attribution.
+## Workspace and verification
 
-## UI and verification
+The selected inspection controls before-FEN, arrow and optional resulting board.
+Review supports PGN/file import and navigation; Explore supports FEN, legal
+pointer/UCI moves, promotion, branching and undo/redo. Project-owned neutral
+styles and local assets support phone tabs, keyboard focus and reduced motion.
 
-Use independent project styles, with a minimal board-first interface like
-Lichess. The current slice removes the pitch/feature-card block and adds
-an inspector; the full neutral-theme/layout redesign is still planned.
-Every played move and every engine PV ply is a target for inspection.
-Free FEN exploration, board synchronization to selected PV ply and search
-traces remain future work. Tutoring, coaching, learner memory, profiles and
-drills are excluded from the architecture, not dormant capabilities.
-
-Unit tests cover target replay, evidence checking, model transport and
-cancellation with mocked providers. Existing real engine capture fixtures
-are reused. Browser smoke tests verify discoverability and game/PV controls;
-live providers are not called without a configured user endpoint/key.
-
-The release baseline now has `npm run check` and a production-browser smoke
-suite. Installation verifies pinned engine assets before copying them;
-no fonts are downloaded at build or runtime. Runtime audit is a separate
-CI check, with development-tooling exceptions recorded in DEPENDENCIES.md.
-
-`src/core/engine.ts` now owns the serialized UCI lane and worker lifetime.
-`lib/stockfish.ts` is a compatibility export during migration. Each active
-startup/search has a deadline and AbortSignal; cancellation/error retires
-its worker, and messages from retired workers are ignored. Game review
-aborts its previous run before replacement and guards every publication.
-
-`src/core/uci.ts` parses scores, bounds and WDL independently of PV. It
-normalizes White's perspective and derives explicit terminal outcomes from
-chess.js. The classifier uses expected-score loss and reports unavailable
-when it lacks outcome evidence; it never turns mate distance into pawns.
-
-The workspace now separates the immutable imported game from an independent
-exploration history. `src/core/exploration.ts` applies legal UCI moves and
-truncates redo on branching. FEN/file/PGN input stays at the boundary. The
-selected interpretation target controls both board position and arrow; a
-before/result toggle replays exactly that move. Keyboard and pointer moves,
-explicit promotions, undo/redo and navigation share the same chess core.
-The interface uses project-owned neutral tokens and a responsive board/rail.
+`npm run check` runs lint, types, unit regression tests and a Webpack production
+build. Playwright uses the actual shipped Worker and exercises both workflows,
+replacement/cancel recovery, depth selection, comparisons, exports and layout.
+Installation verifies pinned engine asset hashes/modes. CI runs these checks,
+runtime dependency audit and attribution guard. Development-only upstream
+audit exceptions are recorded in DEPENDENCIES.md. No network font dependency.

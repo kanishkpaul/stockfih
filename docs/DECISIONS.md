@@ -130,3 +130,14 @@ inspection select a before-FEN and legal move so board/arrow/evidence agree;
 allow a resulting-position toggle. Use a flat neutral board/rail interface,
 local assets and keyboard UCI entry alongside drag/click. Promotion is an
 explicit choice. Controls and labels are shared across desktop and phones.
+
+## 2026-10-17: Interpret observed search and same-root alternatives
+
+Retain actual UCI depth observations rather than narrating an imagined search
+process. Make every reported line inspectable by legal replay. Record nodes,
+time and pinned engine/options in exportable snapshots. Compare a selected
+move with unrestricted search by clearing history and running both at the same
+root/depth/options, restricting only the second root via searchmoves. State
+finite-depth limitations and expose the searched reply as a continuation.
+This fulfills search interpretation; NNUE causal attribution remains outside
+this release. Export contains engine evidence only, never AI connection state.

@@ -12,6 +12,7 @@ const positions = {
   stalemate: "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1",
   promotion: "7k/P7/6K1/8/8/8/8/8 w - - 0 1",
   enPassant: "rnbqkbnr/1pp1pppp/p7/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3",
+  counterfactual: "r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 3 3",
   castling: "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1",
 };
 const engine = spawn(process.execPath, ["public/stockfish/stockfish-18-lite-single.js"]);
@@ -39,6 +40,10 @@ try {
     await send(`ucinewgame\nsetoption name MultiPV value 3\nposition fen ${fen}\ngo depth 8`, line => line.startsWith("bestmove"));
     output.positions[name] = { fen, lines: lines.slice(offset) };
   }
+  const fen = positions.counterfactual;
+  const offset = lines.length;
+  await send(`ucinewgame\nsetoption name MultiPV value 3\nposition fen ${fen}\ngo depth 8 searchmoves g8f6`, line => line.startsWith("bestmove"));
+  output.restricted = { fen, rootMove: "g8f6", lines: lines.slice(offset) };
   mkdirSync("tests/fixtures/uci", { recursive: true });
   writeFileSync("tests/fixtures/uci/stockfish-18.json", `${JSON.stringify(output, null, 2)}\n`);
 } finally { engine.kill(); }

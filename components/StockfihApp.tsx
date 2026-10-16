@@ -3,6 +3,8 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { Chess } from "chess.js";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FlipHorizontal2 } from "lucide-react";
+import { SearchTrace } from "@/components/SearchTrace";
+import { comparisonFacts, traceExport } from "@/src/core/search-trace";
 import { MoveInspector } from "@/components/MoveInspector";
 import { MoveList } from "@/components/MoveList";
 import { PositionBoard } from "@/components/PositionBoard";
@@ -12,7 +14,7 @@ import { buildMoveAnalysis, formatEval } from "@/lib/classify";
 import { getStockfishClient } from "@/src/core/engine";
 import { explore, play, type Exploration } from "@/src/core/exploration";
 import { movesToInspect, type MoveEvidence } from "@/src/core/interpretation";
-import type { MoveAnalysis, PositionAnalysis } from "@/lib/types";
+import type { MoveAnalysis, PositionAnalysis, MoveComparison } from "@/lib/types";
 
 export function StockfihApp() {
   const [game, setGame] = useState(() => parsePgn(SAMPLE_PGN));
@@ -29,6 +31,8 @@ export function StockfihApp() {
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [inspected, setInspected] = useState("");
+  const [traceDepth, setTraceDepth] = useState<number | null>(null);
+  const [comparison, setComparison] = useState<MoveComparison | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [square, setSquare] = useState<string | null>(null);
   const [railPanel, setRailPanel] = useState("engine");
@@ -41,7 +45,12 @@ export function StockfihApp() {
   const played = mode === "review" ? game.moves[ply - 1] ?? null : null;
   let targets: MoveEvidence[] = [];
   let evidenceError: string | null = null;
-  try { targets = movesToInspect(position, played); }
+  const frame = position?.trace?.find(frame => frame.depth === traceDepth);
+  const inspectedPosition = position && frame ? { ...position, depth: frame.depth, lines: frame.lines } : position;
+  try {
+    targets = movesToInspect(inspectedPosition, played);
+    if (comparison) targets = targets.map(target => ({ ...target, facts: [...target.facts, ...comparisonFacts(comparison, target)] }));
+  }
   catch { evidenceError = "The engine evidence cannot be replayed legally. Analyze this position again."; }
   const target = targets.find(move => move.id === inspected) ?? targets[0];
   let boardFen = target?.fen ?? baseFen;
@@ -59,7 +68,7 @@ export function StockfihApp() {
   }
 
   function stop() { run.current?.abort(); setStatus(current => current === "loading" ? "cancelled" : current); }
-  function resetInspection() { setInspected(""); setShowResult(false); setSquare(null); setPromotion(null); setError(null); }
+  function resetInspection() { setTraceDepth(null); setComparison(null); setInspected(""); setShowResult(false); setSquare(null); setPromotion(null); setError(null); }
   function navigate(next: number) {
     if (mode === "explore") { stop(); setVariation(current => ({ ...current, cursor: next })); }
     else setPly(next);
@@ -125,6 +134,31 @@ export function StockfihApp() {
       if (controller.signal.aborted) return;
       setStatus("error"); setError(failure instanceof Error ? failure.message : "Analysis failed. Retry.");
     }
+  }
+
+  async function compare() {
+    if (!target) return;
+    stop(); const controller = new AbortController(); run.current = controller;
+    setStatus("loading"); setError(null); setProgress({ completed: 0, total: 2 });
+    try {
+      const client = getStockfishClient();
+      await client.newGame(controller.signal);
+      const unrestricted = await client.analyzePosition(target.fen, depth, controller.signal);
+      controller.signal.throwIfAborted(); setProgress({ completed: 1, total: 2 });
+      await client.newGame(controller.signal);
+      const restricted = await client.analyzePosition(target.fen, depth, controller.signal, target.uci);
+      controller.signal.throwIfAborted();
+      setComparison({ fen: target.fen, uci: target.uci, unrestricted, restricted });
+      setProgress({ completed: 2, total: 2 }); setStatus("done");
+    } catch (failure) {
+      if (controller.signal.aborted) return;
+      setStatus("error"); setError(failure instanceof Error ? failure.message : "Comparison failed.");
+    }
+  }
+  function exportTrace() {
+    if (!position) return;
+    const url = URL.createObjectURL(new Blob([traceExport(position, comparison)], { type: "application/json" }));
+    const link = document.createElement("a"); link.href = url; link.download = "stockfih-search-trace.json"; link.click(); URL.revokeObjectURL(url);
   }
 
   const terminalText = board.isCheckmate() ? "Checkmate" : board.isStalemate() ? "Stalemate" : `${board.turn() === "w" ? "White" : "Black"} to move`;
@@ -201,12 +235,20 @@ export function StockfihApp() {
           </div>
           <p role="status" aria-label="Analysis status">{status === "loading" ? `Analyzing ${progress.completed} / ${progress.total} positions…` : status === "done" ? "Analysis complete" : status === "cancelled" ? "Analysis cancelled. Partial results are retained." : status === "error" ? "Analysis failed. Retry when ready." : "Ready"}</p>
           {status === "loading" && <progress value={progress.completed} max={progress.total || 1} aria-label="Analysis progress" />}
+          {position && <><div className="actions"><Button variant="secondary" onClick={exportTrace}>Export trace</Button><span className="muted">{traceDepth ? `Inspecting depth ${traceDepth}` : `Final depth ${position.depth}`}</span></div>
+            <SearchTrace position={position} selected={traceDepth} onSelect={value => {
+              stop(); setTraceDepth(value); setShowResult(false);
+              const first = position.trace?.find(frame => frame.depth === value)?.lines[0]?.pv[0];
+              if (first) setInspected(`pv:${position.fen}:1:0:${first}`);
+            }} /></>}
           {position?.terminal && <p>{position.terminal.kind === "mate" ? `Checkmate: ${position.terminal.winner === "w" ? "White" : "Black"} wins` : `Draw: ${position.terminal.reason}`}</p>}
         </section>
         <section id="panel-moves" data-panel="moves" data-active={railPanel === "moves"}><div className="section-heading"><h2>{mode === "review" ? "Game" : "Variation"}</h2><span className="muted">{mode === "review" ? game.headers.Result ?? "*" : "Independent branch"}</span></div>
           <MoveList moves={moves} analyses={moveAnalyses} selectedPly={cursor} onSelect={navigate} />
         </section>
-        <section id="panel-explain" data-panel="explain" data-active={railPanel === "explain"}><MoveInspector targets={targets} targetId={target?.id ?? ""} onSelect={id => { setInspected(id); setShowResult(false); setSquare(null); }} /></section>
+        <section id="panel-explain" data-panel="explain" data-active={railPanel === "explain"}>
+          {target && <><Button variant="secondary" disabled={status === "loading"} onClick={compare}>Compare selected move</Button><p className="muted">Search this move against unrestricted Stockfish at the same root and depth.</p></>}
+          <MoveInspector targets={targets} targetId={target?.id ?? ""} onSelect={id => { stop(); setInspected(id); setShowResult(false); setSquare(null); }} /></section>
       </aside>
     </div>
     <footer>Engine evidence, not hidden reasoning. <a href="https://github.com/kanishkpaul/stockfih">Source &amp; methodology</a> · <a href="/stockfish/Copying.txt">Stockfish license</a></footer>

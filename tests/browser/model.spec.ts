@@ -37,3 +37,16 @@ test("a real local model produces checked move explanations without a key", asyn
   await expect(page.locator(".inspector-answer")).toContainText("White plays e4", { timeout: 35_000 });
   await page.screenshot({ path: "output/playwright/local-model.png", fullPage: true });
 });
+
+test("an abandoned provider response cannot overwrite a newly selected move", async ({ page }) => {
+  await configure(page, "https://model.example/v1", "test-model");
+  await page.route("https://model.example/v1/chat/completions", async route => {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    await route.fulfill({ json: { choices: [{ message: { content: '{"facts":[0,1]}' } }] } });
+  });
+  await page.getByRole("button", { name: "Explain selected move", exact: true }).click();
+  await page.getByRole("button", { name: "Next move", exact: true }).click();
+  await expect(page.locator(".inspector-answer")).toHaveCount(0);
+  await page.getByRole("button", { name: "Explain selected move", exact: true }).click();
+  await expect(page.locator(".inspector-answer")).toContainText("Black plays e5");
+});

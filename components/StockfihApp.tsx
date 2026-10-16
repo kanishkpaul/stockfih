@@ -28,6 +28,7 @@ export function StockfihApp() {
   const [depth, setDepth] = useState(12);
   const [analyses, setAnalyses] = useState<Record<string, PositionAnalysis>>({});
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "cancelled" | "error">("idle");
+  const [purpose, setPurpose] = useState<"analysis" | "comparison">("analysis");
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [inspected, setInspected] = useState("");
@@ -70,7 +71,8 @@ export function StockfihApp() {
   function stop() { run.current?.abort(); setStatus(current => current === "loading" ? "cancelled" : current); }
   function resetInspection() { setTraceDepth(null); setComparison(null); setInspected(""); setShowResult(false); setSquare(null); setPromotion(null); setError(null); }
   function navigate(next: number) {
-    if (mode === "explore") { stop(); setVariation(current => ({ ...current, cursor: next })); }
+    stop();
+    if (mode === "explore") { setVariation(current => ({ ...current, cursor: next })); }
     else setPly(next);
     resetInspection();
   }
@@ -116,6 +118,7 @@ export function StockfihApp() {
   }
 
   async function analyze() {
+    setPurpose("analysis");
     stop(); const controller = new AbortController(); run.current = controller;
     setStatus("loading"); setError(null);
     const fens = mode === "review" ? [game.initialFen, ...game.moves.map(move => move.afterFen)] : [baseFen];
@@ -138,6 +141,7 @@ export function StockfihApp() {
 
   async function compare() {
     if (!target) return;
+    setPurpose("comparison");
     stop(); const controller = new AbortController(); run.current = controller;
     setStatus("loading"); setError(null); setProgress({ completed: 0, total: 2 });
     try {
@@ -161,6 +165,11 @@ export function StockfihApp() {
     const link = document.createElement("a"); link.href = url; link.download = "stockfih-search-trace.json"; link.click(); URL.revokeObjectURL(url);
   }
 
+  const critical = moves.filter(move => ["Inaccuracy", "Mistake", "Blunder", "Allows mate"].includes(moveAnalyses[move.index]?.classification));
+  function nextCritical() {
+    const next = critical.find(move => move.ply > cursor) ?? critical[0];
+    if (next) navigate(next.ply);
+  }
   const terminalText = board.isCheckmate() ? "Checkmate" : board.isStalemate() ? "Stalemate" : `${board.turn() === "w" ? "White" : "Black"} to move`;
   return <main className="workspace">
     <header className="app-header">
@@ -227,8 +236,8 @@ export function StockfihApp() {
           (event.currentTarget.querySelectorAll("button")[next] as HTMLButtonElement).focus();
         }}>{[["engine", "Engine"], ["moves", "Moves"], ["explain", "Explain"]].map(([id, label]) => <button key={id} id={`tab-${id}`} role="tab" tabIndex={railPanel === id ? 0 : -1} aria-selected={railPanel === id} aria-controls={`panel-${id}`} onClick={() => setRailPanel(id)}>{label}</button>)}</div>
         <section id="panel-engine" className="engine-panel" data-panel="engine" data-active={railPanel === "engine"}>
-          <div className="section-heading"><h2>Search</h2><span className="eval" aria-label="Evaluation from White's perspective">{formatEval(position?.evaluation ?? null)}</span></div>
-          <p className="muted">{played ? "Evaluation after the selected game move" : "Evaluation of the analysis root"} · White&apos;s perspective</p>
+          <div className="section-heading"><h2>Search</h2><span className="eval" aria-label="Evaluation from White's perspective">{formatEval(frame?.lines[0]?.score ?? position?.evaluation ?? null)}</span></div>
+          <p className="muted">{traceDepth ? `Depth ${traceDepth} evaluation of the analysis root` : played ? "Final evaluation after the selected game move" : "Final evaluation of the analysis root"} · White&apos;s perspective</p>
           <div className="actions"><label htmlFor="depth">Depth</label><select id="depth" value={depth} disabled={status === "loading"} onChange={event => { stop(); setDepth(Number(event.target.value)); setAnalyses({}); resetInspection(); }}>{[8, 10, 12, 14, 16].map(value => <option key={value}>{value}</option>)}</select>
             <Button onClick={analyze} disabled={status === "loading"}>{mode === "review" ? "Analyze Game" : "Analyze position"}</Button>
             {status === "loading" && <Button variant="secondary" onClick={stop}>Cancel analysis</Button>}
@@ -244,13 +253,15 @@ export function StockfihApp() {
           {position?.terminal && <p>{position.terminal.kind === "mate" ? `Checkmate: ${position.terminal.winner === "w" ? "White" : "Black"} wins` : `Draw: ${position.terminal.reason}`}</p>}
         </section>
         <section id="panel-moves" data-panel="moves" data-active={railPanel === "moves"}><div className="section-heading"><h2>{mode === "review" ? "Game" : "Variation"}</h2><span className="muted">{mode === "review" ? game.headers.Result ?? "*" : "Independent branch"}</span></div>
+          <div className="actions"><Button variant="ghost" disabled={!critical.length} onClick={nextCritical}>Next critical move</Button><span className="muted">{critical.length} outcome changes</span></div>
           <MoveList moves={moves} analyses={moveAnalyses} selectedPly={cursor} onSelect={navigate} />
         </section>
         <section id="panel-explain" data-panel="explain" data-active={railPanel === "explain"}>
-          {target && <><Button variant="secondary" disabled={status === "loading"} onClick={compare}>Compare selected move</Button><p className="muted">Search this move against unrestricted Stockfish at the same root and depth.</p></>}
-          <MoveInspector targets={targets} targetId={target?.id ?? ""} onSelect={id => { stop(); setInspected(id); setShowResult(false); setSquare(null); }} /></section>
+          {target && <><Button variant="secondary" disabled={status === "loading"} onClick={compare}>Compare selected move</Button><p className="muted">Search this move against unrestricted Stockfish at the same root and depth.</p>
+            {status === "loading" && purpose === "comparison" && <div className="actions"><p role="status" aria-label="Comparison status">Comparing {progress.completed} / 2 searches…</p><Button variant="secondary" onClick={stop}>Cancel comparison</Button></div>}</>}
+          <MoveInspector targets={targets} targetId={target?.id ?? ""} onSelect={id => { stop(); setInspected(id); setShowResult(false); setSquare(null); setPromotion(null); }} /></section>
       </aside>
     </div>
-    <footer>Engine evidence, not hidden reasoning. <a href="https://github.com/kanishkpaul/stockfih">Source &amp; methodology</a> · <a href="/stockfish/Copying.txt">Stockfish license</a></footer>
+    <footer>Engine evidence, not hidden reasoning. <a href="https://github.com/kanishkpaul/stockfih">Source &amp; methodology</a> · <a href="/stockfish/Copying.txt">Stockfish license</a> · <a href="/stockfish/stockfish-18.0.7-source.tar.gz">Engine source</a></footer>
   </main>;
 }

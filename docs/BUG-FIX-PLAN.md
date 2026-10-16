@@ -126,3 +126,12 @@ game-service imports are not required for this repair release.
 No desktop scaffold, native sidecars or OS-keychain promise belongs in it.
 Tutoring, drills and learner profiles are outside the product scope permanently
 unless the owner explicitly changes that scope.
+
+## Release implementation status
+
+The six repair groups are implemented or retired as described in
+AUDIT-STATUS.md. Cache/storage code was removed rather than replaced with a
+new durable cache; provider requests and evidence remain transient. Search
+traces and same-root comparisons extend the initial fact contract. Tests,
+CI and demo artifacts now exist. Remaining browser/provider/dependency limits
+are explicit; production promotion waits for owner preview review.

@@ -21,8 +21,8 @@ program. Tutoring, coaching, drills and learner profiles are excluded.
    A move description or a fluent model answer alone does not satisfy this.
 4. **Useful checked explanations.** Explain every game move and engine/PV
    move from richer tested evidence. Keep BYOK/local compatibility and
-   bounded on-demand requests. Verify one real hosted and one real local
-   setup, including their browser-origin requirements. The current fact-ID
+   bounded on-demand requests. Verify a real local setup and test hosted BYOK transport/checking; the
+   owner waived live hosted calls. Document browser-origin requirements. The current fact-ID
    selector is an initial contract, not the finished explanation experience.
 5. **Release quality.** Fresh install, lint, typecheck, tests, build and CI
    pass. Browser tests cover the primary workflows and cancellation races.
@@ -54,10 +54,12 @@ documented local model setup, with their checks passing. At that point tag
 the release and stop expanding v1. Reopen scope only for a concrete defect
 or an explicit new version request.
 
-## Next implementation task
+## Implementation evidence
 
-Take the foundation repairs in `BUG-FIX-PLAN.md` groups 1–3 in order. The
-first increment establishes passing lint/typecheck/tests/build and app CI,
-updates vulnerable dependencies, and makes engine asset installation
-reproducible. Then repair worker cancellation/recovery and chess truth
-before adding search-trace features.
+Milestones 1–4 are implemented: engine lifecycle/chess truth, independent
+Review/Explore, depth/counterfactual/export evidence and richer checked facts
+with a real local model. Milestone 5 is covered by the release checks and
+AUDIT-STATUS.md; remote CI status is recorded with the final publication.
+Milestone 6 includes DEMO.md, screenshots/recording and preview deployment.
+Production promotion and final tagging wait for owner review of that preview.
+Do not call a deployment remotely accepted until it has been reviewed.

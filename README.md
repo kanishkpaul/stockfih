@@ -1,68 +1,88 @@
 # Stockfih
 
-A web workspace for inspecting Stockfish's analysis and the evidence behind
-every move. Review games and explore positions; interpretability is the
-sole product scope, with optional BYOK/local AI explanations.
+**Inspect what Stockfish searches.** A board-first web app for game review,
+legal position exploration and evidence-based move interpretation. No model
+key is needed to use the workspace.
 
-`main` holds the Next.js app. The desktop rebuild stays on local-only `new`.
-The interface direction is minimal and Lichess-inspired, without the shared
-design kit.
+![Search workspace](docs/demo/desktop.png)
 
-## Run
+[Short recorded demo](docs/demo/walkthrough.webm) · [60-second walkthrough](docs/DEMO.md) ·
+[Architecture](docs/ARCHITECTURE.md) · [Verified scope and limits](docs/AUDIT-STATUS.md)
 
-Requires Node 20.9 or newer.
+## Try it
 
-```bash
+Requires Node 20.9+ (CI uses Node 24).
+
+```sh
 npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. Load a PGN or the sample, select a game move,
-and run Analyze Game to inspect all Stockfish candidate lines. The move
-inspector includes every ply in each available PV, not just its first move.
-Free FEN exploration and search-depth traces are planned.
+Open http://localhost:3000. The sample is already loaded. Choose **Analyze
+Game**, then select a game move or any ply in any candidate line. The board
+shows its before-position; **Show result** applies exactly that move.
 
-## Optional AI
+- **Review:** PGN text/file import, navigation, outcome-based labels and critical moves.
+- **Explore:** FEN import, legal drag/click/UCI moves, promotion, undo/redo and independent branches.
+- **Search:** inspect evaluations and candidates at reported depths, preferred-move changes, nodes and elapsed time.
+- **Compare selected move:** two fresh searches at the same root/settings, one restricted to that move; inspect the searched reply and alternative score.
+- **Export trace:** JSON with positions, lines, depth observations, engine hashes/options and comparison evidence.
 
-Open **AI connection — BYOK or local**. Enter an OpenAI-compatible base URL,
-model name and optional API key, then choose **Explain selected move**.
-Requests go directly from the browser to the chosen endpoint; keys stay in
-this tab's memory. No shared server token, automatic calls, silent fallback
-or persistent explanation cache. The retired `/api/explain` route returns 410;
-`HF_TOKEN`/`HF_MODEL` are no longer used.
+## Optional AI, under your control
 
-Local examples: Ollama `http://localhost:11434/v1`, LM Studio
-`http://localhost:1234/v1`. The local server must permit the app's origin.
-Hosted endpoints need HTTPS and browser CORS support. An HTTPS deployment
-may also need browser local-network permission; connection failures are
-shown, never silently rerouted. See [Ollama compatibility](https://docs.ollama.com/api/openai-compatibility),
-[Ollama origins](https://docs.ollama.com/faq) and
-[LM Studio CORS settings](https://lmstudio.ai/docs/developer/core/server/settings).
+Open **AI connection — BYOK or local** and enter an OpenAI-compatible base
+URL/model and optional key. The model selects and orders checked facts:
+move effects, geometric attacks, material, searched replies, WDL and
+same-root comparisons. Unknown references or generated prose are rejected.
 
-AI currently selects and orders checked facts. Free-form generated causes
-are not displayed. This first slice explains observed move/line evidence;
-it does not yet explain NNUE internals or prove why a move is optimal.
-Provider transport is tested with mocks; no live model calls were made.
+Keys stay in tab memory and go directly to the selected endpoint. No shared
+server key, persistence, proxy, automatic request or silent fallback. Requests
+are cancellable, output-bounded and limited to 30 seconds. Hosted providers
+need HTTPS and browser CORS support; local HTTP needs a loopback endpoint
+and appropriate browser permission. [Local setup and live verification](docs/LOCAL-AI.md).
 
-## Checks and plans
+The cached Qwen/llama.cpp setup passed the real Chromium flow. Hosted live
+BYOK testing was waived; transport, transient credentials and checker behavior
+are covered by tests. This is search interpretation, not a causal explanation
+of NNUE internals or a guarantee that an engine line will be played.
 
-```bash
-npm test
-npm run lint
-npx tsc --noEmit --incremental false
-npm run build
+## Engineering and verification
+
+```sh
+npm run check             # lint, strict types, unit regressions, production build
+npx playwright install chromium
+npm run test:browser      # actual shipped Worker and browser workflows
+npm audit --omit=dev
 ```
 
-- [Interpretability roadmap](docs/PLAN.md)
-- [V1 finish line](docs/RELEASE.md): working scope, acceptance criteria and demonstration
-- [Original bug audit](docs/BUG-AUDIT.md) and [repair backlog](docs/BUG-FIX-PLAN.md)
-- [Frontend direction](docs/FRONTEND-DESIGN.md)
-- [Architecture](docs/ARCHITECTURE.md), [decisions](docs/DECISIONS.md), [style](docs/STYLE.md)
+The engine has a serialized UCI lane, bounded startup/search lifetimes,
+retirement on cancellation/error and retry. Tests replay captured output from
+the pinned build and exercise actual WASM in Chromium. The chess boundary
+preserves mate winners, terminal states, WDL perspective and legal move provenance.
+The build uses system fonts and verified local engine assets. CI repeats the
+checks from a fresh install. [Dependency review](docs/DEPENDENCIES.md).
 
-Known engine/classification and dependency issues remain in the backlog.
-The audit script reproduces the original audited commit, not current fixes.
+Finite-depth lite Stockfish is weaker than the full engine. Outcome labels
+use transparent UI thresholds, not validated human-performance probabilities.
+Chromium is tested; native Safari/Firefox and physical phones remain unverified.
+FEN searches cannot reconstruct repetition history. See the
+[audit disposition](docs/AUDIT-STATUS.md) for all recorded limitations.
+
+## Scope and repository
+
+Interpretability only. Tutoring, coaching, quizzes, drills and learner profiles
+are excluded. [V1 acceptance](docs/RELEASE.md), [scope](docs/PLAN.md),
+[decisions](docs/DECISIONS.md), [style](docs/STYLE.md) and
+[independent design](DESIGN.md) document the engineering choices.
+
+`main` is the active web app. The parked desktop rebuild stays on local-only
+`new`; never push that branch. The historical audit reproduces source at its
+recorded commit, not current defects. Production promotion waits for preview review.
 
 ## License
 
-Stockfih's code is MIT. The distributed Stockfish files are GPLv3, from the
-pinned npm package, with their license in `public/stockfish/Copying.txt`.
+Stockfih application code is MIT. The separately distributed, unmodified
+Stockfish engine is GPLv3. Its license, corresponding source archive, required
+lite weights, upstream notices and build instructions are served in
+[public/stockfish](public/stockfish/SOURCE.md). No third-party design kit or
+reference-site code/assets are used.

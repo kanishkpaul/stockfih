@@ -46,6 +46,8 @@ test("the workspace fits a phone and remains usable at 200 percent zoom", async 
   await expect(page.getByRole("tab", { name: "Explain", exact: true })).toHaveAttribute("aria-selected", "true");
   await page.getByRole("tab", { name: "Engine", exact: true }).click();
   await page.screenshot({ path: "output/playwright/workspace-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.screenshot({ path: "output/playwright/workspace-desktop.png", fullPage: true });
   await page.evaluate(() => { document.documentElement.style.zoom = "2"; });
@@ -98,4 +100,36 @@ test("depth inspection, same-root comparison and trace export work with the ship
   expect(trace.schema).toBe("stockfih.search-trace.v1");
   expect(trace.comparison.restricted.provenance.rootMove).toBeTruthy();
   expect(trace.position.trace).toHaveLength(8);
+});
+
+test("critical move navigation reaches an analyzed outcome change", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Analyze Game", exact: true }).click();
+  await expect(page.getByRole("status", { name: "Analysis status", exact: true })).toContainText("complete", { timeout: 60_000 });
+  await expect(page.getByRole("button", { name: "Next critical move", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Next critical move", exact: true }).click();
+  await expect(page.locator('[aria-current="step"]')).toHaveCount(1);
+});
+
+test("denied browser storage cannot prevent import or engine analysis", async ({ page }) => {
+  await page.addInitScript(() => {
+    for (const name of ["localStorage", "sessionStorage"]) Object.defineProperty(window, name, { get() { throw new DOMException("Denied", "SecurityError"); } });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore", exact: true }).click();
+  await page.getByRole("button", { name: "Analyze position", exact: true }).click();
+  await expect(page.getByRole("status", { name: "Analysis status", exact: true })).toContainText("complete");
+  await expect(page.getByLabel("Checked evidence")).toContainText("Stockfish candidate");
+});
+
+test("a phone comparison exposes cancellation beside its initiating control", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.route("**/stockfish/*.js", async route => { await new Promise(resolve => setTimeout(resolve, 500)); await route.continue(); });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Next move", exact: true }).click();
+  await page.getByRole("tab", { name: "Explain", exact: true }).click();
+  await page.getByRole("button", { name: "Compare selected move", exact: true }).click();
+  await expect(page.getByRole("status", { name: "Comparison status", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel comparison", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Compare selected move", exact: true })).toBeEnabled();
 });

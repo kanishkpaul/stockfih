@@ -153,3 +153,11 @@ concrete alternative/refutation evidence without inventing a tactical cause.
 Verified the browser interface against the Mac's cached Qwen3-VL-8B-Instruct
 Q4_K_M via llama.cpp on loopback, without a key. The owner waived live hosted
 BYOK testing; transport/credential/checker behavior is covered by tests.
+
+## 2026-10-17: Distribute the existing engine's corresponding source
+
+Serve the pinned Stockfish.js source revision and required lite NNUE weight
+alongside the unmodified WASM, binary hashes, GPL license, upstream notices
+and build instructions. No new GPL dependency is introduced. The source
+archive is a release artifact, not application implementation. Record that
+a byte-identical local compiler rebuild was not performed.

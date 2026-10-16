@@ -26,16 +26,15 @@ variation is searched evidence, not a causal account of network internals.
 
 ## Current Capabilities
 
-Next.js/React, TypeScript, chess.js and browser Stockfish. PGN review exists.
-The first interpretation slice exposes checked movement and engine-line
-facts for game moves and all PV plies. AI selects and orders fact references;
-unverified generated prose is not displayed. Requests are on demand.
-Keys live only in tab memory and go directly to the chosen endpoint.
-
-Free FEN exploration, search-depth traces, motif evidence and NNUE
-interventions are future work. Known engine/classification bugs remain.
-BYOK/local transport is tested with mocks; live endpoints were not called.
-Browser CORS and private-network permissions constrain compatibility.
+Next.js/React, TypeScript, chess.js and browser Stockfish. PGN/file Review and
+FEN Explore support legal moves, promotions, navigation and independent branches.
+Every game/PV ply has a synchronized before/result board and checked facts.
+Search depth observations, same-root restricted alternatives and JSON traces
+carry engine build/settings provenance. Models select checked evidence IDs;
+keys stay in tab memory. The local Qwen/llama.cpp browser flow is verified;
+hosted BYOK live calls were waived. Regression checks and CI cover the main
+flows. Browser origin/private-network policy remains a compatibility limit.
+NNUE interventions are outside v1. See docs/AUDIT-STATUS.md for known limits.
 
 ## Brand Commitments
 

@@ -68,3 +68,8 @@ Unit tests cover target replay, evidence checking, model transport and
 cancellation with mocked providers. Existing real engine capture fixtures
 are reused. Browser smoke tests verify discoverability and game/PV controls;
 live providers are not called without a configured user endpoint/key.
+
+The release baseline now has `npm run check` and a production-browser smoke
+suite. Installation verifies pinned engine assets before copying them;
+no fonts are downloaded at build or runtime. Runtime audit is a separate
+CI check, with development-tooling exceptions recorded in DEPENDENCIES.md.

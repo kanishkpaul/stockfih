@@ -37,12 +37,16 @@ npm run lint
 npx --no-install tsc --noEmit --incremental false
 npm test
 npm run build
+npm run check
+npm run test:browser
 node docs/audit/reproduce.mjs
 git log main --format=%B | sh scripts/check-attribution.sh
 ```
 
 The audit probes reproduce existing defects; they are not acceptance tests
-for repaired behavior. `npm test` covers the first interpretability slice; `npm run check` does not exist yet. Baseline lint failures are recorded in `docs/BUG-AUDIT.md`.
+for repaired behavior. `npm run check` runs lint, types, unit tests and build. `npm run test:browser`
+uses the production build. The original lint failures in the historical audit
+are repaired; remaining upstream tooling advisories are in `docs/DEPENDENCIES.md`.
 
 Interpretability is the sole product scope. Every game move and every Stockfish
 candidate/PV move should be inspectable. AI is an optional BYOK/local

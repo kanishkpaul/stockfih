@@ -89,3 +89,14 @@ explanation cache. Keep model configuration in the inspector's tab memory.
 Collapse import and remove the promotional header/feature cards so the
 workspace leads. This is an incremental interface change; the complete
 neutral theme and synchronized board inspection remain release work.
+
+## 2026-10-16: Establish reproducible release checks
+
+Pin the patched framework/lint pair and engine, verify engine asset hashes
+and stable modes, use system fonts, and run lint/type/unit/build plus a real
+Chromium engine smoke test in CI. Track the remaining development-only
+upstream glob advisory in DEPENDENCIES.md instead of downgrading the framework.
+
+Production builds use Next's supported Webpack option. The upgraded
+Turbopack's internal build socket is denied in the managed development
+environment; Webpack builds without that dependency and without font fetches.

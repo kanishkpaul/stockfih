@@ -34,16 +34,12 @@ class StockfishClient {
       // Try to fetch the worker file first to provide a clearer error when
       // the asset is missing or served incorrectly.
       try {
-        // eslint-disable-next-line no-console
-        console.debug("Fetching Stockfish worker:", this.enginePath);
         const resp = await fetch(this.enginePath, { method: "GET" });
 
         if (!resp.ok) {
           reject(new Error(`Failed to fetch Stockfish worker: ${resp.status} ${resp.statusText}`));
           return;
         }
-        // eslint-disable-next-line no-console
-        console.debug("Stockfish worker fetched successfully");
       } catch (err) {
         reject(new Error(`Failed to fetch Stockfish worker: ${String(err)}`));
         return;
@@ -52,11 +48,7 @@ class StockfishClient {
       let worker: Worker;
 
       try {
-        // eslint-disable-next-line no-console
-        console.debug("Constructing Stockfish worker from:", this.enginePath);
         worker = new Worker(this.enginePath);
-        // eslint-disable-next-line no-console
-        console.debug("Stockfish worker constructed");
       } catch (err) {
         reject(new Error(`Failed to construct Stockfish worker: ${String(err)}`));
         return;
@@ -70,12 +62,12 @@ class StockfishClient {
 
       worker.addEventListener("message", (event) => {
         // Worker may post a string or an object; normalize to a trimmed string.
-        let raw = event.data ?? "";
+        const raw = event.data ?? "";
         let line: string;
 
         try {
           line = typeof raw === "string" ? raw.trim() : JSON.stringify(raw).trim();
-        } catch (e) {
+        } catch {
           line = String(raw).trim();
         }
 
@@ -83,8 +75,6 @@ class StockfishClient {
           return;
         }
 
-        // eslint-disable-next-line no-console
-        console.debug("Stockfish worker ->", line);
 
         if (!this.sawUciOk && line === "uciok") {
           this.sawUciOk = true;
@@ -116,14 +106,13 @@ class StockfishClient {
         } catch (err) {
           // Surface parsing issues to the console for easier debugging.
           // Don't reject here; let the pending request timeout if analysis fails.
-          // eslint-disable-next-line no-console
           console.error("Error consuming Stockfish line:", err, line);
         }
       });
 
       worker.addEventListener("error", (ev) => {
         window.clearTimeout(timeout);
-        const message = (ev && (ev as any).message) || "Stockfish worker error";
+        const message = ev.message || "Stockfish worker error";
         reject(new Error(String(message)));
       });
 

@@ -22,14 +22,14 @@ program. Tutoring, coaching, drills and learner profiles are excluded.
 4. **Useful checked explanations.** Explain every game move and engine/PV
    move from richer tested evidence. Keep BYOK/local compatibility and
    bounded on-demand requests. Verify a real local setup and test hosted BYOK transport/checking; the
-   owner waived live hosted calls. Document browser-origin requirements. The current fact-ID
-   selector is an initial contract, not the finished explanation experience.
-5. **Release quality.** Fresh install, lint, typecheck, tests, build and CI
-   pass. Browser tests cover the primary workflows and cancellation races.
+   owner waived live hosted calls. Document browser-origin requirements. Checked facts include move effects, searched replies, root outcomes and
+   same-root comparisons; free causal prose remains outside the contract.
+5. **Release quality.** Fresh install, lint, typecheck, tests and build
+   pass; CI is configured to repeat these checks when published. Browser tests cover the primary workflows and cancellation races.
    Resolve release-relevant audit findings; record remaining limitations
    explicitly rather than treating the historical audit as current status.
-6. **A public demonstration.** Deploy the app with a sample position/game
-   that works immediately without a model key. Publish a short demo,
+6. **A reproducible demonstration.** Run locally with a sample position/game
+   that works immediately without a model key. Include a short demo,
    screenshots, architecture overview, setup instructions and an honest
    explanation of the engineering tradeoffs and measured limitations.
 
@@ -38,7 +38,7 @@ program. Tutoring, coaching, drills and learner profiles are excluded.
 The main story is ownership of the whole system: asynchronous worker and
 UCI lifecycle, typed chess/evidence boundaries, measurable search traces,
 constrained model integration, responsive UI, regression tests, CI and a
-usable deployment. Let the running product and reproducible artifacts carry
+runnable demonstration. Let the running product and reproducible artifacts carry
 that story. No invented performance numbers or claim of reading Stockfish's
 internal reasoning.
 
@@ -49,9 +49,10 @@ optional follow-up after a bounded feasibility check on the shipped WASM
 build; they do not block this release. Maia, accounts, social features,
 training workflows and more provider integrations are not release gates.
 
-Finish when the six items above work in the deployed application and the
-documented local model setup, with their checks passing. At that point tag
-the release and stop expanding v1. Reopen scope only for a concrete defect
+Finish the implementation when the six items above work in the local
+application and documented local model setup, with their checks passing.
+Deployment is excluded at the owner's request on 2026-10-17. Stop expanding v1;
+publication and release tagging remain separate owner decisions. Reopen scope only for a concrete defect
 or an explicit new version request.
 
 ## Implementation evidence
@@ -59,8 +60,7 @@ or an explicit new version request.
 Milestones 1–4 are implemented: engine lifecycle/chess truth, independent
 Review/Explore, depth/counterfactual/export evidence and richer checked facts
 with a real local model. Milestone 5 is covered by the release checks and
-AUDIT-STATUS.md; remote CI status is recorded with the final publication.
-Milestone 6 has DEMO.md and screenshots/recording. Hosted preview deployment
-is pending valid Vercel authentication; see VALIDATION.md.
-Production promotion and final tagging wait for owner review of that preview.
-Do not call a deployment remotely accepted until it has been reviewed.
+AUDIT-STATUS.md; remote CI has not run for the unpublished local commits.
+Milestone 6 has DEMO.md, screenshots/recording and a runnable local build.
+The owner declined deployment; no Vercel authentication is required.
+See VALIDATION.md for checked evidence and publication status.

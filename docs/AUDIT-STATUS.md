@@ -38,5 +38,5 @@ This is a bounded regression review, not a claim that all possible bugs are gone
 - Engine source and lite weights accompany the binaries. A byte-identical local
   Emscripten rebuild has not been performed. There is no offline service worker,
   account system, database, game-service import or secret persistence.
-- The preview is for owner review. Production promotion and final release tagging
-  wait for that review; deployment status alone is not a remote acceptance test.
+- Deployment was declined by the owner. The demo runs locally; remote CI has
+  not run for the unpublished implementation commits. No hosted release is claimed.

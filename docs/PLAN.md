@@ -7,8 +7,7 @@ selects checked facts through direct BYOK/local-compatible requests.
 
 Implemented mechanics and acceptance evidence are in RELEASE.md,
 AUDIT-STATUS.md and ARCHITECTURE.md. The cached local Qwen model passed a real
-browser test; hosted live calls were waived. Production promotion awaits owner
-review of a preview. Finish this release before adding features.
+browser test; hosted live calls were waived. The owner declined deployment; the demonstration runs locally. Finish this release before adding features.
 
 Search evidence does not establish a cognitive reasoning process or causal
 network attribution. NNUE interventions require a separate feasibility and

@@ -77,7 +77,7 @@ are excluded. [V1 acceptance](docs/RELEASE.md), [scope](docs/PLAN.md),
 
 `main` is the active web app. The parked desktop rebuild stays on local-only
 `new`; never push that branch. The historical audit reproduces source at its
-recorded commit, not current defects. Production promotion waits for preview review.
+recorded commit, not current defects. Deployment is excluded at the owner's request; the verified demo runs locally.
 
 ## License
 

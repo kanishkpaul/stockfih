@@ -161,3 +161,12 @@ alongside the unmodified WASM, binary hashes, GPL license, upstream notices
 and build instructions. No new GPL dependency is introduced. The source
 archive is a release artifact, not application implementation. Record that
 a byte-identical local compiler rebuild was not performed.
+
+
+## 2026-10-17: Finish locally without deployment
+
+The owner declined Vercel and deployment. Remove hosted preview/production
+from the release finish line; retain the tested local build and demo artifacts.
+Stop the Vercel login attempt. No hosted release or remote CI pass is claimed.
+The earlier main push was blocked for its possible production-deployment side
+effect, and the owner did not approve that risk, so keep these commits local.

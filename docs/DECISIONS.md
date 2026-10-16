@@ -100,3 +100,11 @@ upstream glob advisory in DEPENDENCIES.md instead of downgrading the framework.
 Production builds use Next's supported Webpack option. The upgraded
 Turbopack's internal build socket is denied in the managed development
 environment; Webpack builds without that dependency and without font fetches.
+
+## 2026-10-16: Retire cancelled workers and serialize analysis
+
+Use a single serialized engine lane first. A cancelled/timed-out/crashed
+worker is terminated instead of reusing its undrained UCI stream. The next
+job creates and handshakes a new worker. Game runs own AbortControllers;
+new imports and unmount abort them. Fixtures and controlled timers test
+serialization, late output, startup/readiness failures, crash and recovery.

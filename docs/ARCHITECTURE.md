@@ -73,3 +73,9 @@ The release baseline now has `npm run check` and a production-browser smoke
 suite. Installation verifies pinned engine assets before copying them;
 no fonts are downloaded at build or runtime. Runtime audit is a separate
 CI check, with development-tooling exceptions recorded in DEPENDENCIES.md.
+
+`src/core/engine.ts` now owns the serialized UCI lane and worker lifetime.
+`lib/stockfish.ts` is a compatibility export during migration. Each active
+startup/search has a deadline and AbortSignal; cancellation/error retires
+its worker, and messages from retired workers are ignored. Game review
+aborts its previous run before replacement and guards every publication.

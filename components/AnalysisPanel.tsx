@@ -29,6 +29,7 @@ type AnalysisPanelProps = {
   analysisStatus: "idle" | "loading" | "done" | "error";
   depth: 8 | 10 | 12 | 14;
   onAnalyze: () => void;
+  onCancel: () => void;
   onChangeDepth: (depth: 8 | 10 | 12 | 14) => void;
   currentPositionAnalysis: PositionAnalysis | null;
   selectedAnalysis: MoveAnalysis | null;
@@ -52,6 +53,7 @@ export function AnalysisPanel({
   analysisStatus,
   depth,
   onAnalyze,
+  onCancel,
   onChangeDepth,
   selectedAnalysis,
   selectedMove,
@@ -107,6 +109,7 @@ export function AnalysisPanel({
                 Analyze every position with in-browser Stockfish.
               </div>
             </div>
+            {analysisStatus === "loading" && <Button variant="secondary" onClick={onCancel}>Cancel analysis</Button>}
             <Button onClick={onAnalyze} disabled={analysisStatus === "loading"}>
               {analysisStatus === "loading" ? "Analyzing..." : "Analyze Game"}
             </Button>

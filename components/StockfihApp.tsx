@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useEffectEvent, useState } from "react";
+import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { ChessBoardPanel } from "@/components/ChessBoardPanel";
@@ -29,6 +29,8 @@ function createInitialGame() {
 }
 
 export function StockfihApp() {
+  const run = useRef<AbortController | null>(null);
+  useEffect(() => () => run.current?.abort(), []);
   const [pgnInput, setPgnInput] = useState(SAMPLE_PGN);
   const [game, setGame] = useState<ParsedGame | null>(() => createInitialGame());
   const [parseError, setParseError] = useState<string | null>(null);
@@ -99,6 +101,7 @@ export function StockfihApp() {
   function loadGame(rawPgn: string) {
     try {
       const parsed = parsePgn(rawPgn);
+      run.current?.abort();
       startTransition(() => {
         setGame(parsed);
         setPgnInput(rawPgn);
@@ -118,6 +121,9 @@ export function StockfihApp() {
       return;
     }
 
+    run.current?.abort();
+    const controller = new AbortController();
+    run.current = controller;
     setAnalysisStatus("loading");
     setAnalysisError(null);
     setPositionAnalyses({});
@@ -129,7 +135,8 @@ export function StockfihApp() {
       const nextPositionAnalyses: Record<number, PositionAnalysis> = {};
       const nextMoveAnalyses: Record<number, MoveAnalysis> = {};
 
-      await client.newGame();
+      await client.newGame(controller.signal);
+      controller.signal.throwIfAborted();
       setAnalysisProgress({
         completed: 0,
         currentMove: game.moves[0]?.san ?? "Initial position",
@@ -144,7 +151,8 @@ export function StockfihApp() {
           total: positions.length,
         });
 
-        const positionAnalysis = await client.analyzePosition(positions[index], depth);
+        const positionAnalysis = await client.analyzePosition(positions[index], depth, controller.signal);
+        controller.signal.throwIfAborted();
         nextPositionAnalyses[index] = positionAnalysis;
         setPositionAnalyses({ ...nextPositionAnalyses });
 
@@ -166,6 +174,7 @@ export function StockfihApp() {
       });
       setAnalysisStatus("done");
     } catch (error) {
+      if (controller.signal.aborted) return;
       setAnalysisStatus("error");
       setAnalysisError(
         error instanceof Error
@@ -232,6 +241,7 @@ export function StockfihApp() {
             analysisProgress={analysisProgress}
             analysisStatus={analysisStatus}
             depth={depth}
+            onCancel={() => { run.current?.abort(); setAnalysisStatus("idle"); }}
             onAnalyze={handleAnalyzeGame}
             onChangeDepth={setDepth}
             selectedAnalysis={selectedAnalysis}

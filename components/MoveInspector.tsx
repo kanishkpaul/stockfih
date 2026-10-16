@@ -1,27 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { completionUrl, explainMove, movesToInspect, type ModelConnection, type MoveEvidence } from "@/src/core/interpretation";
-import type { ParsedGameMove, PositionAnalysis } from "@/lib/types";
+import { completionUrl, explainMove, type ModelConnection, type MoveEvidence } from "@/src/core/interpretation";
 import { Button } from "@/components/ui/button";
 
-export function MoveInspector({ position, played }: {
-  position: PositionAnalysis | null;
-  played: ParsedGameMove | null;
+export function MoveInspector({ targets, targetId, onSelect }: {
+  targets: MoveEvidence[]; targetId: string; onSelect: (id: string) => void;
 }) {
   const [connection, setConnection] = useState<ModelConnection>({
     baseUrl: "http://localhost:11434/v1", model: "", apiKey: "",
   });
-  const [selected, setSelected] = useState("");
   const [answer, setAnswer] = useState<{ identity: string; text: string } | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [failure, setFailure] = useState<{ identity: string; message: string } | null>(null);
   const active = useRef<AbortController | null>(null);
-  let targets: MoveEvidence[] = [];
-  let evidenceError: string | null = null;
-  try { targets = movesToInspect(position, played); }
-  catch { evidenceError = "Cannot replay this evidence legally. Analyze the game again before requesting an explanation."; }
-  const target = targets.find(move => move.id === selected) ?? targets[0];
+  const target = targets.find(move => move.id === targetId) ?? targets[0];
   // Keys stay in React memory. Provider identity uses a revision, never key text.
   const [revision, setRevision] = useState(0);
   const identity = JSON.stringify([target, connection.baseUrl, connection.model, revision]);
@@ -66,7 +59,6 @@ export function MoveInspector({ position, played }: {
   return (
     <section className="inspector" aria-label="Move interpretation">
       <h3>Inspect a move</h3>
-      {evidenceError && <p role="alert">{evidenceError}</p>}
       <details>
         <summary>AI connection — BYOK or local</summary>
         <p>OpenAI-compatible chat endpoint. Ollama uses port 11434; LM Studio commonly uses 1234. Hosted services need browser CORS support.</p>
@@ -81,12 +73,12 @@ export function MoveInspector({ position, played }: {
       {target ? (
         <>
           <label htmlFor="inspect-move">Game move or Stockfish continuation</label>
-          <select id="inspect-move" value={target.id} onChange={event => setSelected(event.target.value)}>
+          <select id="inspect-move" value={target.id} onChange={event => onSelect(event.target.value)}>
             {targets.map(move => <option key={move.id} value={move.id}>{move.label}</option>)}
           </select>
           <details>
             <summary>Position before this move (FEN)</summary>
-            <p className="font-mono text-sm">{target.fen}</p>
+            <p className="notation" data-testid="inspected-fen">{target.fen}</p>
           </details>
           <ul aria-label="Checked evidence">{target.facts.map(fact => <li key={fact}>{fact}</li>)}</ul>
           <p className="inspector-note">Stockfish evidence explains the searched line. It does not reveal the network&apos;s internal reasoning. AI can select and order these checked facts; it cannot invent tactical causes.</p>

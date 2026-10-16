@@ -1,255 +1,214 @@
 "use client";
 
-import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
-
-import { AnalysisPanel } from "@/components/AnalysisPanel";
-import { ChessBoardPanel } from "@/components/ChessBoardPanel";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { Chess } from "chess.js";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FlipHorizontal2 } from "lucide-react";
+import { MoveInspector } from "@/components/MoveInspector";
 import { MoveList } from "@/components/MoveList";
-import { PgnInput } from "@/components/PgnInput";
-import { Card, CardContent } from "@/components/ui/card";
-import { buildMoveAnalysis } from "@/lib/classify";
-import {
-  DEFAULT_FEN,
-  parsePgn,
-  SAMPLE_PGN,
-} from "@/lib/chess";
-import { getStockfishClient } from "@/lib/stockfish";
-import type {
-  MoveAnalysis,
-  ParsedGame,
-  PositionAnalysis,
-} from "@/lib/types";
-
-function createInitialGame() {
-  try {
-    return parsePgn(SAMPLE_PGN);
-  } catch {
-    return null;
-  }
-}
+import { PositionBoard } from "@/components/PositionBoard";
+import { Button } from "@/components/ui/button";
+import { DEFAULT_FEN, parsePgn, SAMPLE_PGN } from "@/lib/chess";
+import { buildMoveAnalysis, formatEval } from "@/lib/classify";
+import { getStockfishClient } from "@/src/core/engine";
+import { explore, play, type Exploration } from "@/src/core/exploration";
+import { movesToInspect, type MoveEvidence } from "@/src/core/interpretation";
+import type { MoveAnalysis, PositionAnalysis } from "@/lib/types";
 
 export function StockfihApp() {
+  const [game, setGame] = useState(() => parsePgn(SAMPLE_PGN));
+  const [pgn, setPgn] = useState(SAMPLE_PGN);
+  const [mode, setMode] = useState<"review" | "explore">("review");
+  const [variation, setVariation] = useState<Exploration>(() => explore(DEFAULT_FEN));
+  const [ply, setPly] = useState(0);
+  const [fenInput, setFenInput] = useState(DEFAULT_FEN);
+  const [uciInput, setUciInput] = useState("");
+  const [orientation, setOrientation] = useState<"white" | "black">("white");
+  const [depth, setDepth] = useState(12);
+  const [analyses, setAnalyses] = useState<Record<string, PositionAnalysis>>({});
+  const [status, setStatus] = useState<"idle" | "loading" | "done" | "cancelled" | "error">("idle");
+  const [progress, setProgress] = useState({ completed: 0, total: 0 });
+  const [error, setError] = useState<string | null>(null);
+  const [inspected, setInspected] = useState("");
+  const [showResult, setShowResult] = useState(false);
+  const [square, setSquare] = useState<string | null>(null);
+  const [railPanel, setRailPanel] = useState("engine");
+  const [promotion, setPromotion] = useState<{ fen: string; from: string; to: string } | null>(null);
   const run = useRef<AbortController | null>(null);
   useEffect(() => () => run.current?.abort(), []);
-  const [pgnInput, setPgnInput] = useState(SAMPLE_PGN);
-  const [game, setGame] = useState<ParsedGame | null>(() => createInitialGame());
-  const [parseError, setParseError] = useState<string | null>(null);
-  const [selectedPly, setSelectedPly] = useState(0);
-  const [orientation, setOrientation] = useState<"white" | "black">("white");
-  const [analysisStatus, setAnalysisStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState({
-    completed: 0,
-    currentMove: "Waiting",
-    total: 0,
-  });
-  const [depth, setDepth] = useState<8 | 10 | 12 | 14>(10);
-  const [positionAnalyses, setPositionAnalyses] = useState<Record<number, PositionAnalysis>>({});
-  const [moveAnalyses, setMoveAnalyses] = useState<Record<number, MoveAnalysis>>({});
-  const selectedMove =
-    game && selectedPly > 0 ? game.moves[selectedPly - 1] : null;
-  const selectedAnalysis =
-    selectedMove ? moveAnalyses[selectedMove.index] ?? null : null;
-  const currentFen =
-    game?.moves[selectedPly - 1]?.afterFen ??
-    (selectedPly === 0 ? game?.initialFen : undefined) ??
-    DEFAULT_FEN;
-  const currentPositionAnalysis = positionAnalyses[selectedPly] ?? null;
 
-  const handleKeyboardNavigation = useEffectEvent((event: KeyboardEvent) => {
-    const target = event.target as HTMLElement | null;
+  const baseFen = mode === "review" ? game.moves[ply - 1]?.afterFen ?? game.initialFen : variation.fens[variation.cursor];
+  const position = analyses[baseFen] ?? null;
+  const played = mode === "review" ? game.moves[ply - 1] ?? null : null;
+  let targets: MoveEvidence[] = [];
+  let evidenceError: string | null = null;
+  try { targets = movesToInspect(position, played); }
+  catch { evidenceError = "The engine evidence cannot be replayed legally. Analyze this position again."; }
+  const target = targets.find(move => move.id === inspected) ?? targets[0];
+  let boardFen = target?.fen ?? baseFen;
+  if (target && showResult) {
+    const board = new Chess(target.fen);
+    board.move({ from: target.uci.slice(0, 2), to: target.uci.slice(2, 4), promotion: target.uci[4] });
+    boardFen = board.fen();
+  }
+  const board = new Chess(boardFen);
+  const cursor = mode === "review" ? ply : variation.cursor;
+  const moves = mode === "review" ? game.moves : variation.moves;
+  const moveAnalyses: Record<number, MoveAnalysis> = {};
+  for (const move of moves) {
+    if (analyses[move.beforeFen] && analyses[move.afterFen]) moveAnalyses[move.index] = buildMoveAnalysis(move, analyses[move.beforeFen], analyses[move.afterFen]);
+  }
 
-    if (
-      !game ||
-      target?.tagName === "TEXTAREA" ||
-      target?.tagName === "INPUT" ||
-      target?.tagName === "SELECT" ||
-      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
-      target?.isContentEditable
-    ) {
-      return;
-    }
-
-    if (event.key === "ArrowRight") {
+  function stop() { run.current?.abort(); setStatus(current => current === "loading" ? "cancelled" : current); }
+  function resetInspection() { setInspected(""); setShowResult(false); setSquare(null); setPromotion(null); setError(null); }
+  function navigate(next: number) {
+    if (mode === "explore") { stop(); setVariation(current => ({ ...current, cursor: next })); }
+    else setPly(next);
+    resetInspection();
+  }
+  const keyboard = useEffectEvent((event: KeyboardEvent) => {
+    const control = event.target instanceof HTMLElement && event.target.closest("input, textarea, select, summary, [contenteditable=true]");
+    if (control || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
       event.preventDefault();
-      setSelectedPly((current) => Math.min(game.moves.length, current + 1));
-    }
-
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      setSelectedPly((current) => Math.max(0, current - 1));
+      navigate(event.key === "Home" ? 0 : event.key === "End" ? moves.length : Math.max(0, Math.min(moves.length, cursor + (event.key === "ArrowRight" ? 1 : -1))));
     }
   });
-
   useEffect(() => {
-    window.addEventListener("keydown", handleKeyboardNavigation);
-    return () => window.removeEventListener("keydown", handleKeyboardNavigation);
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
   }, []);
 
-  function resetAnalysisState() {
-    setAnalysisStatus("idle");
-    setAnalysisError(null);
-    setAnalysisProgress({
-      completed: 0,
-      currentMove: "Waiting",
-      total: 0,
-    });
-    setPositionAnalyses({});
-    setMoveAnalyses({});
+  function loadPgn(text: string) {
+    try {
+      const parsed = parsePgn(text); stop(); setGame(parsed); setPgn(text); setPly(0);
+      setMode("review"); setAnalyses({}); setStatus("idle"); resetInspection();
+    } catch (failure) { setError(failure instanceof Error ? failure.message : "Cannot parse this PGN."); }
+  }
+  function loadFen(fen: string) {
+    try { const next = explore(fen); stop(); setVariation(next); setMode("explore"); setFenInput(next.fens[0]); setStatus("idle"); resetInspection(); }
+    catch { setError("Invalid FEN. Include both kings and all six FEN fields."); }
+  }
+  function applyMove(fen: string, uci: string) {
+    try {
+      const base = mode === "explore" && fen === variation.fens[variation.cursor] ? variation : explore(fen);
+      const next = play(base, uci); stop(); setVariation(next); setMode("explore"); resetInspection(); setUciInput("");
+      return true;
+    } catch { setError("That move is not legal in this position. Use UCI notation, for example e2e4."); return false; }
+  }
+  function move(from: string, to: string) {
+    const choices = board.moves({ verbose: true }).filter(candidate => candidate.from === from && candidate.to === to);
+    if (choices.some(candidate => candidate.promotion)) { setPromotion({ fen: boardFen, from, to }); return false; }
+    return applyMove(boardFen, `${from}${to}`);
+  }
+  function clickSquare(next: string) {
+    if (square && square !== next && board.moves({ verbose: true }).some(candidate => candidate.from === square && candidate.to === next)) {
+      move(square, next); setSquare(null);
+    } else setSquare(next);
   }
 
-  function loadGame(rawPgn: string) {
+  async function analyze() {
+    stop(); const controller = new AbortController(); run.current = controller;
+    setStatus("loading"); setError(null);
+    const fens = mode === "review" ? [game.initialFen, ...game.moves.map(move => move.afterFen)] : [baseFen];
+    setProgress({ completed: 0, total: fens.length });
     try {
-      const parsed = parsePgn(rawPgn);
-      run.current?.abort();
-      startTransition(() => {
-        setGame(parsed);
-        setPgnInput(rawPgn);
-        setParseError(null);
-        setSelectedPly(0);
-        resetAnalysisState();
-      });
-    } catch (error) {
-      setParseError(
-        error instanceof Error ? error.message : "The PGN could not be parsed.",
-      );
-    }
-  }
-
-  async function handleAnalyzeGame() {
-    if (!game || analysisStatus === "loading") {
-      return;
-    }
-
-    run.current?.abort();
-    const controller = new AbortController();
-    run.current = controller;
-    setAnalysisStatus("loading");
-    setAnalysisError(null);
-    setPositionAnalyses({});
-    setMoveAnalyses({});
-
-    try {
-      const client = getStockfishClient();
-      const positions = [game.initialFen, ...game.moves.map((move) => move.afterFen)];
-      const nextPositionAnalyses: Record<number, PositionAnalysis> = {};
-      const nextMoveAnalyses: Record<number, MoveAnalysis> = {};
-
-      await client.newGame(controller.signal);
-      controller.signal.throwIfAborted();
-      setAnalysisProgress({
-        completed: 0,
-        currentMove: game.moves[0]?.san ?? "Initial position",
-        total: positions.length,
-      });
-
-      for (let index = 0; index < positions.length; index += 1) {
-        setAnalysisProgress({
-          completed: index,
-          currentMove:
-            index < game.moves.length ? game.moves[index].san : "Final position",
-          total: positions.length,
-        });
-
-        const positionAnalysis = await client.analyzePosition(positions[index], depth, controller.signal);
+      const client = getStockfishClient(); await client.newGame(controller.signal);
+      for (const [index, fen] of fens.entries()) {
         controller.signal.throwIfAborted();
-        nextPositionAnalyses[index] = positionAnalysis;
-        setPositionAnalyses({ ...nextPositionAnalyses });
-
-        if (index > 0) {
-          const move = game.moves[index - 1];
-          nextMoveAnalyses[move.index] = buildMoveAnalysis(
-            move,
-            nextPositionAnalyses[index - 1],
-            nextPositionAnalyses[index],
-          );
-          setMoveAnalyses({ ...nextMoveAnalyses });
-        }
+        const result = await client.analyzePosition(fen, depth, controller.signal);
+        controller.signal.throwIfAborted();
+        setAnalyses(current => ({ ...current, [fen]: result }));
+        setProgress({ completed: index + 1, total: fens.length });
       }
-
-      setAnalysisProgress({
-        completed: positions.length,
-        currentMove: "Complete",
-        total: positions.length,
-      });
-      setAnalysisStatus("done");
-    } catch (error) {
+      setStatus("done");
+    } catch (failure) {
       if (controller.signal.aborted) return;
-      setAnalysisStatus("error");
-      setAnalysisError(
-        error instanceof Error
-          ? error.message
-          : "Stockfish failed while analyzing the game.",
-      );
+      setStatus("error"); setError(failure instanceof Error ? failure.message : "Analysis failed. Retry.");
     }
   }
 
-  return (
-    <main className="min-h-screen">
-      <section className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-        <header className="workspace-header">
-          <h1>Stockfih</h1>
-          <p>Inspect the game. Follow Stockfish’s lines. Explain the evidence.</p>
-        </header>
+  const terminalText = board.isCheckmate() ? "Checkmate" : board.isStalemate() ? "Stalemate" : `${board.turn() === "w" ? "White" : "Black"} to move`;
+  return <main className="workspace">
+    <header className="app-header">
+      <div><h1>Stockfih</h1><p>Inside the search.</p></div>
+      <nav aria-label="Workspace mode">
+        <button aria-pressed={mode === "review"} onClick={() => { stop(); setMode("review"); resetInspection(); }}>Review</button>
+        <button aria-pressed={mode === "explore"} onClick={() => { if (mode !== "explore") loadFen(boardFen); }}>Explore</button>
+      </nav>
+      <span className="engine-name">Stockfish 18 · local WASM</span>
+    </header>
 
-        <details className="workspace-import">
-          <summary>Import a game</summary>
-        <PgnInput
-          error={parseError}
-          headers={game?.headers ?? null}
-          onLoadGame={() => loadGame(pgnInput)}
-          onLoadSample={() => loadGame(SAMPLE_PGN)}
-          onPgnChange={setPgnInput}
-          pgn={pgnInput}
-        />
-        </details>
+    <details className="import-panel"><summary>Import a game or position</summary>
+      <div className="import-grid">
+        <form onSubmit={event => { event.preventDefault(); loadPgn(pgn); }}>
+          <label htmlFor="pgn-input">Game PGN</label><textarea id="pgn-input" value={pgn} onChange={event => setPgn(event.target.value)} />
+          <div className="actions"><Button type="submit">Load Game</Button><Button type="button" variant="secondary" onClick={() => loadPgn(SAMPLE_PGN)}>Load sample</Button>
+            <label className="file-button">Open PGN<input type="file" accept=".pgn,.txt" onChange={async event => {
+              const file = event.target.files?.[0]; if (!file) return;
+              if (file.size > 200_000) { setError("PGN exceeds the 200 KB file limit."); return; }
+              try { loadPgn(await file.text()); } catch { setError("Cannot read this file. Paste its PGN text instead."); }
+            }} /></label></div>
+        </form>
+        <form onSubmit={event => { event.preventDefault(); loadFen(fenInput); }}>
+          <label htmlFor="fen-input">Position FEN</label><textarea id="fen-input" value={fenInput} onChange={event => setFenInput(event.target.value)} />
+          <div className="actions"><Button type="submit">Load position</Button><Button type="button" variant="secondary" onClick={() => loadFen(DEFAULT_FEN)}>Start position</Button></div>
+        </form>
+      </div>
+    </details>
+    {(error || evidenceError) && <p className="error" role="alert">{error ?? evidenceError}</p>}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_360px_minmax(340px,420px)]">
-          <ChessBoardPanel
-            canGoNext={Boolean(game) && selectedPly < (game?.moves.length ?? 0)}
-            canGoPrev={selectedPly > 0}
-            currentFen={currentFen}
-            currentMove={selectedMove}
-            currentPositionAnalysis={currentPositionAnalysis}
-            game={game}
-            onFlip={() =>
-              setOrientation((current) => (current === "white" ? "black" : "white"))
-            }
-            onNext={() =>
-              setSelectedPly((current) =>
-                Math.min(game?.moves.length ?? 0, current + 1),
-              )
-            }
-            onPrev={() => setSelectedPly((current) => Math.max(0, current - 1))}
-            orientation={orientation}
-            selectedPly={selectedPly}
-          />
-
-          <Card className="h-fit xl:sticky xl:top-6">
-            <CardContent className="p-5">
-              <MoveList
-                analyses={moveAnalyses}
-                game={game}
-                onSelectPly={(ply) => setSelectedPly(ply)}
-                selectedPly={selectedPly}
-              />
-            </CardContent>
-          </Card>
-
-          <AnalysisPanel
-            analysisError={analysisError}
-            analysisProgress={analysisProgress}
-            analysisStatus={analysisStatus}
-            depth={depth}
-            onCancel={() => { run.current?.abort(); setAnalysisStatus("idle"); }}
-            onAnalyze={handleAnalyzeGame}
-            onChangeDepth={setDepth}
-            selectedAnalysis={selectedAnalysis}
-            selectedMove={selectedMove}
-            currentPositionAnalysis={currentPositionAnalysis}
-          />
+    <div className="workspace-grid">
+      <section className="board-column" aria-label="Position workspace">
+        <div className="position-heading"><strong>{target?.label ?? (mode === "review" ? "Game start" : "Exploration")}</strong><span>{terminalText}</span></div>
+        <PositionBoard fen={boardFen} uci={!showResult ? target?.uci : undefined} selected={square} orientation={orientation} onMove={move} onSquare={clickSquare} />
+        <div className="board-caption"><span>{target ? (showResult ? "Position after inspected move" : "Position before inspected move") : "Current position"}</span>
+          {target && <button className="text-button" onClick={() => setShowResult(current => !current)}>{showResult ? "Show before" : "Show result"}</button>}
         </div>
+        <div className="transport" aria-label="Move navigation">
+          <Button variant="secondary" aria-label="First position" disabled={cursor === 0} onClick={() => navigate(0)}><ChevronsLeft size={18} /></Button>
+          <Button variant="secondary" aria-label="Previous move" disabled={cursor === 0} onClick={() => navigate(cursor - 1)}><ChevronLeft size={18} /></Button>
+          <span>{cursor} / {moves.length}</span>
+          <Button variant="secondary" aria-label="Next move" disabled={cursor === moves.length} onClick={() => navigate(cursor + 1)}><ChevronRight size={18} /></Button>
+          <Button variant="secondary" aria-label="Last position" disabled={cursor === moves.length} onClick={() => navigate(moves.length)}><ChevronsRight size={18} /></Button>
+          <Button variant="ghost" aria-label="Flip board" onClick={() => setOrientation(current => current === "white" ? "black" : "white")}><FlipHorizontal2 size={18} /></Button>
+        </div>
+        {promotion && <fieldset className="promotion"><legend>Choose promotion</legend>{["q", "r", "b", "n"].map((piece, index) => <Button key={piece} onClick={() => applyMove(promotion.fen, `${promotion.from}${promotion.to}${piece}`)}>{["Queen", "Rook", "Bishop", "Knight"][index]}</Button>)}<Button variant="ghost" onClick={() => setPromotion(null)}>Cancel promotion</Button></fieldset>}
+        <details className="board-tools"><summary>Move entry and FEN</summary>
+        <form className="move-entry" onSubmit={event => { event.preventDefault(); applyMove(boardFen, uciInput.trim()); }}>
+          <label htmlFor="keyboard-move">Play a move</label><input id="keyboard-move" placeholder="e2e4 or a7a8n" value={uciInput} onChange={event => setUciInput(event.target.value)} spellCheck={false} autoComplete="off" />
+          <Button variant="secondary">Play</Button><Button type="button" variant="ghost" onClick={() => loadFen(boardFen)}>Explore this position</Button>
+        </form>
+        <details className="position-fen"><summary>Displayed FEN</summary><p className="notation" data-testid="displayed-fen">{boardFen}</p></details>
+        <p className="board-hint">Drag or click squares to explore. Keyboard: enter UCI above; use ← → or Home / End to navigate.</p>
+        </details>
       </section>
-    </main>
-  );
+
+      <aside className="analysis-rail" aria-label="Engine inspection">
+        <div className="rail-tabs" role="tablist" aria-label="Inspection panels" onKeyDown={event => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault(); event.stopPropagation();
+          const ids = ["engine", "moves", "explain"];
+          const next = event.key === "Home" ? 0 : event.key === "End" ? 2 : (ids.indexOf(railPanel) + (event.key === "ArrowRight" ? 1 : 2)) % 3;
+          setRailPanel(ids[next]);
+          (event.currentTarget.querySelectorAll("button")[next] as HTMLButtonElement).focus();
+        }}>{[["engine", "Engine"], ["moves", "Moves"], ["explain", "Explain"]].map(([id, label]) => <button key={id} id={`tab-${id}`} role="tab" tabIndex={railPanel === id ? 0 : -1} aria-selected={railPanel === id} aria-controls={`panel-${id}`} onClick={() => setRailPanel(id)}>{label}</button>)}</div>
+        <section id="panel-engine" className="engine-panel" data-panel="engine" data-active={railPanel === "engine"}>
+          <div className="section-heading"><h2>Search</h2><span className="eval" aria-label="Evaluation from White's perspective">{formatEval(position?.evaluation ?? null)}</span></div>
+          <p className="muted">{played ? "Evaluation after the selected game move" : "Evaluation of the analysis root"} · White&apos;s perspective</p>
+          <div className="actions"><label htmlFor="depth">Depth</label><select id="depth" value={depth} disabled={status === "loading"} onChange={event => { stop(); setDepth(Number(event.target.value)); setAnalyses({}); resetInspection(); }}>{[8, 10, 12, 14, 16].map(value => <option key={value}>{value}</option>)}</select>
+            <Button onClick={analyze} disabled={status === "loading"}>{mode === "review" ? "Analyze Game" : "Analyze position"}</Button>
+            {status === "loading" && <Button variant="secondary" onClick={stop}>Cancel analysis</Button>}
+          </div>
+          <p role="status" aria-label="Analysis status">{status === "loading" ? `Analyzing ${progress.completed} / ${progress.total} positions…` : status === "done" ? "Analysis complete" : status === "cancelled" ? "Analysis cancelled. Partial results are retained." : status === "error" ? "Analysis failed. Retry when ready." : "Ready"}</p>
+          {status === "loading" && <progress value={progress.completed} max={progress.total || 1} aria-label="Analysis progress" />}
+          {position?.terminal && <p>{position.terminal.kind === "mate" ? `Checkmate: ${position.terminal.winner === "w" ? "White" : "Black"} wins` : `Draw: ${position.terminal.reason}`}</p>}
+        </section>
+        <section id="panel-moves" data-panel="moves" data-active={railPanel === "moves"}><div className="section-heading"><h2>{mode === "review" ? "Game" : "Variation"}</h2><span className="muted">{mode === "review" ? game.headers.Result ?? "*" : "Independent branch"}</span></div>
+          <MoveList moves={moves} analyses={moveAnalyses} selectedPly={cursor} onSelect={navigate} />
+        </section>
+        <section id="panel-explain" data-panel="explain" data-active={railPanel === "explain"}><MoveInspector targets={targets} targetId={target?.id ?? ""} onSelect={id => { setInspected(id); setShowResult(false); setSquare(null); }} /></section>
+      </aside>
+    </div>
+    <footer>Engine evidence, not hidden reasoning. <a href="https://github.com/kanishkpaul/stockfih">Source &amp; methodology</a> · <a href="/stockfish/Copying.txt">Stockfish license</a></footer>
+  </main>;
 }

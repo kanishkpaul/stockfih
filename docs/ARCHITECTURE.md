@@ -84,3 +84,11 @@ aborts its previous run before replacement and guards every publication.
 normalizes White's perspective and derives explicit terminal outcomes from
 chess.js. The classifier uses expected-score loss and reports unavailable
 when it lacks outcome evidence; it never turns mate distance into pawns.
+
+The workspace now separates the immutable imported game from an independent
+exploration history. `src/core/exploration.ts` applies legal UCI moves and
+truncates redo on branching. FEN/file/PGN input stays at the boundary. The
+selected interpretation target controls both board position and arrow; a
+before/result toggle replays exactly that move. Keyboard and pointer moves,
+explicit promotions, undo/redo and navigation share the same chess core.
+The interface uses project-owned neutral tokens and a responsive board/rail.

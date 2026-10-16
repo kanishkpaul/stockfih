@@ -1,7 +1,7 @@
 # Frontend direction: a quiet chess workspace
 
-Status: target design brief. The first inspector slice exists; the complete
-layout/theme redesign is not implemented. Interpretability is the sole scope;
+Status: the Review/Explore workspace and independent neutral theme are
+implemented. Search traces and richer explanations follow. Interpretability is the sole scope;
 tutoring is excluded from the product.
 Platform: web. Mode: operate. Review and Explore have equal priority, as
 confirmed by the owner. This direction is independent of the design kit.

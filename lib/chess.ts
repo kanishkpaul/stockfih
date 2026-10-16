@@ -22,6 +22,7 @@ export function parsePgn(pgn: string): ParsedGame {
     throw new Error("Paste a PGN before loading the game.");
   }
 
+  if (normalized.length > 200_000) throw new Error("PGN exceeds the 200 KB text limit.");
   const chess = new Chess();
   chess.loadPgn(normalized, { strict: false });
 
@@ -32,36 +33,25 @@ export function parsePgn(pgn: string): ParsedGame {
     throw new Error("This PGN parsed, but it does not contain any moves.");
   }
 
-  const moves: ParsedGameMove[] = verboseMoves.map((move, index) => {
-    const moveNumber = Number(move.before.split(" ")[5]);
-    const moveUci = uciFromMove(move);
-
-    return {
-      id: `${index}-${moveUci}`,
-      index,
-      ply: index + 1,
-      moveNumber,
-      color: move.color,
-      san: move.san,
-      lan: move.lan,
-      from: move.from,
-      to: move.to,
-      promotion: move.promotion,
-      captured: move.captured,
-      beforeFen: move.before,
-      afterFen: move.after,
-      isCapture: Boolean(move.captured),
-      isCheck: move.san.includes("+") || move.san.includes("#"),
-      isMate: move.san.includes("#"),
-      isCastle: move.isKingsideCastle() || move.isQueensideCastle(),
-    };
-  });
+  const moves = verboseMoves.map(recordMove);
 
   return {
     headers,
     initialFen: moves[0]?.beforeFen ?? new Chess().fen(),
     moves,
     pgn: normalized,
+  };
+}
+
+export function recordMove(move: ChessMove, index: number): ParsedGameMove {
+  return {
+    id: `${move.before}:${move.lan}`, index, ply: index + 1,
+    moveNumber: Number(move.before.split(" ")[5]), color: move.color,
+    san: move.san, lan: move.lan, from: move.from, to: move.to,
+    promotion: move.promotion, captured: move.captured,
+    beforeFen: move.before, afterFen: move.after, isCapture: Boolean(move.captured),
+    isCheck: move.san.includes("+") || move.san.includes("#"),
+    isMate: move.san.includes("#"), isCastle: move.isKingsideCastle() || move.isQueensideCastle(),
   };
 }
 

@@ -121,3 +121,12 @@ Keep cp swings as a separate descriptive statistic only when both scores
 are cp. Drop Brilliant/Great heuristics and artificial mate centipawns.
 Preserve real FEN fullmove numbering and en-passant captures. UCI regression
 fixtures are captured from the pinned engine with UCI_ShowWDL enabled.
+
+## 2026-10-16: Ship one synchronized Review/Explore workspace
+
+Keep the imported game intact when exploring alternatives. Store variation
+positions and a cursor, with redo discarded only on a new branch. Make
+inspection select a before-FEN and legal move so board/arrow/evidence agree;
+allow a resulting-position toggle. Use a flat neutral board/rail interface,
+local assets and keyboard UCI entry alongside drag/click. Promotion is an
+explicit choice. Controls and labels are shared across desktop and phones.
